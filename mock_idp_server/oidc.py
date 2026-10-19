@@ -242,7 +242,7 @@ def token():
   id_token = jwt.encode(payload, config.PRIVATE_KEY_PATH.read_bytes(), algorithm="RS256",
                         headers={"kid": config.KEY_ID})
   access_token = secrets.token_urlsafe(24)
-  tokens[access_token] = {"user": user, "expires_at": now + config.TOKEN_TTL_SECONDS}
+  tokens[access_token] = {"user": user, "expires_at": time.time() + config.TOKEN_TTL_SECONDS}
 
   return jsonify({
     "access_token": access_token,
