@@ -1,5 +1,7 @@
 # mock-idp
 
+[![ci](https://github.com/mallotore/mock-idp/actions/workflows/ci.yml/badge.svg)](https://github.com/mallotore/mock-idp/actions/workflows/ci.yml)
+
 A tiny OpenID Connect identity provider for **local development and CI**. Log in as any email with any
 groups and claims, and get a signed ID token back. Only Docker is needed.
 
