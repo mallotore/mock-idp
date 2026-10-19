@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mock OIDC Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 400px;
+      margin: 60px auto;
+      background: #fafafa;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .banner {
+      background: #ffc107;
+      color: #333;
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 6px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+    h2 { text-align: center; margin-bottom: 20px; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input, select, textarea, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      margin-top: 4px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+    button {
+      margin-top: 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover { background-color: #0056b3; }
+  </style>
+</head>
+<body>
+<div class="banner">MOCK IdP - NOT FOR PRODUCTION</div>
+<h2>Mock OIDC Login</h2>
+<form action="/login" method="post">
+  {% if users %}
+  <label for="preset">Saved users</label>
+  <select id="preset">
+    <option value="">- custom -</option>
+    {% for user in users %}<option value="{{ loop.index0 }}">{{ user.email }}</option>{% endfor %}
+  </select>
+  {% endif %}
+
+  <label for="email">(*) Email</label>
+  <input type="email" id="email" name="email" placeholder="user@example.com" required>
+
+  <label for="groups">Groups (separated by a comma)</label>
+  <input type="text" id="groups" name="groups" placeholder="admin@example.com,engineer@example.com">
+
+  <label for="claims">Extra claims (JSON object, optional)</label>
+  <textarea id="claims" name="claims" rows="2" placeholder='{"name": "Jane Doe"}'></textarea>
+
+  <input type="hidden" name="redirect_uri" value="{{ redirect_uri or '' }}">
+  <input type="hidden" name="state" value="{{ state or '' }}">
+  <input type="hidden" name="nonce" value="{{ nonce or '' }}">
+  <input type="hidden" name="code_challenge" value="{{ code_challenge or '' }}">
+  <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method or '' }}">
+
+  <button type="submit">Login</button>
+</form>
+{% if users %}
+<script>
+  const users = {{ users|tojson }};
+  document.getElementById("preset").addEventListener("change", (event) => {
+    const user = users[event.target.value] || {email: "", groups: [], claims: {}};
+    document.getElementById("email").value = user.email;
+    document.getElementById("groups").value = user.groups.join(",");
+    document.getElementById("claims").value = Object.keys(user.claims).length ? JSON.stringify(user.claims) : "";
+  });
+</script>
+{% endif %}
+</body>
+</html>

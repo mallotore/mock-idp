@@ -1,0 +1,7 @@
+{
+  "users": [
+    {"email": "admin@example.com", "groups": ["admins@example.com", "devs@example.com"], "name": "Ada Admin"},
+    {"email": "dev@example.com", "groups": ["devs@example.com"], "name": "Dan Dev"},
+    {"email": "guest@example.com", "groups": []}
+  ]
+}
