@@ -38,9 +38,9 @@ def configure_vault():
     "bound_claims": {"groups": list(GROUPS)},
   })
   accessor = vault("GET", "sys/auth")["data"]["oidc/"]["accessor"]
+  for policy in {p for policies in GROUPS.values() for p in policies}:
+    vault("PUT", f"sys/policies/acl/{policy}", json={"policy": 'path "secret/*" { capabilities = ["read"] }'})
   for name, policies in GROUPS.items():
-    for policy in policies:
-      vault("PUT", f"sys/policies/acl/{policy}", json={"policy": 'path "secret/*" { capabilities = ["read"] }'})
     group_id = vault("POST", "identity/group", json={"name": name, "type": "external", "policies": policies})["data"]["id"]
     vault("POST", "identity/group-alias", json={"name": name, "mount_accessor": accessor, "canonical_id": group_id})
 

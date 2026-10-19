@@ -72,6 +72,10 @@ def purge_expired():
     for key in [k for k, v in registry.items() if v["expires_at"] < now]:
       del registry[key]
 
+def request_data():
+  """Form fields, or a JSON object for clients that post JSON."""
+  return request.form if request.form else request.get_json(silent=True) or {}
+
 def client_credentials():
   """Returns (client_id, client_secret) from HTTP Basic auth or the request body."""
   auth = request.headers.get("Authorization", "")
@@ -81,14 +85,15 @@ def client_credentials():
       return unquote_plus(client_id), unquote_plus(secret)
     except Exception:
       return None, None
-  data = request.form if request.form else request.get_json(silent=True) or {}
+  data = request_data()
   return data.get("client_id"), data.get("client_secret")
 
-def parse_pkce(challenge, method):
-  """Returns (pkce, error); pkce is None when the request carries no challenge."""
-  method = method or "plain"
+def parse_pkce(params):
+  """Returns (pkce, error) from /authorize query args or /login form fields; pkce is None without a challenge."""
+  challenge = params.get("code_challenge")
   if not challenge:
     return None, None
+  method = params.get("code_challenge_method") or "plain"
   if method not in ("S256", "plain"):
     return None, "unsupported code_challenge_method"
   return {"challenge": challenge, "method": method}, None
@@ -157,9 +162,7 @@ def authorize():
   if args.get("client_id") not in (None, config.CLIENT_ID):
     return jsonify({"error": "unauthorized_client"}), 400
 
-  challenge = args.get("code_challenge")
-  method = args.get("code_challenge_method", "plain")
-  pkce, pkce_error = parse_pkce(challenge, method)
+  pkce, pkce_error = parse_pkce(args)
   if pkce_error:
     return jsonify({"error": "invalid_request", "error_description": pkce_error}), 400
 
@@ -170,7 +173,8 @@ def authorize():
     return issue_code_and_redirect(redirect_uri, args.get("state"), args.get("nonce"), user, pkce)
 
   return render_template("login.html", users=load_users(), redirect_uri=redirect_uri, state=args.get("state"),
-                         nonce=args.get("nonce"), code_challenge=challenge, code_challenge_method=method)
+                         nonce=args.get("nonce"), code_challenge=args.get("code_challenge"),
+                         code_challenge_method=args.get("code_challenge_method"))
 
 @oidc_bp.route("/login", methods=["POST"])
 def login():
@@ -189,8 +193,7 @@ def login():
   except ValueError:
     return jsonify({"error": "claims must be a JSON object"}), 400
 
-  challenge = form.get("code_challenge")
-  pkce, pkce_error = parse_pkce(challenge, form.get("code_challenge_method"))
+  pkce, pkce_error = parse_pkce(form)
   if pkce_error:
     return jsonify({"error": "invalid_request", "error_description": pkce_error}), 400
   user = build_user(email, form.get("groups"), claims)
@@ -198,7 +201,7 @@ def login():
 
 @oidc_bp.route("/token", methods=["POST"])
 def token():
-  data = request.form if request.form else request.get_json(silent=True) or {}
+  data = request_data()
 
   if data.get("grant_type", "authorization_code") != "authorization_code":
     return jsonify({"error": "unsupported_grant_type"}), 400
@@ -239,7 +242,7 @@ def token():
   id_token = jwt.encode(payload, config.PRIVATE_KEY_PATH.read_bytes(), algorithm="RS256",
                         headers={"kid": config.KEY_ID})
   access_token = secrets.token_urlsafe(24)
-  tokens[access_token] = {"user": user, "expires_at": time.time() + config.TOKEN_TTL_SECONDS}
+  tokens[access_token] = {"user": user, "expires_at": now + config.TOKEN_TTL_SECONDS}
 
   return jsonify({
     "access_token": access_token,

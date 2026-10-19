@@ -81,8 +81,9 @@ def test_login_requires_email(client):
 
 
 def test_id_token_contains_identity_groups_and_nonce(client):
-  token = exchange(client, login(client)).get_json()["id_token"]
-  claims = jwt.decode(token, signing_key(client), algorithms=["RS256"], audience=CLIENT_ID, issuer=ISSUER)
+  response = exchange(client, login(client))
+  token = response.get_json()["id_token"]
+  claims = decode(client, response)
   assert claims["email"] == claims["sub"] == "jane@example.com"
   assert claims["groups"] == ["admins", "devs"]
   assert claims["nonce"] == "nn"
