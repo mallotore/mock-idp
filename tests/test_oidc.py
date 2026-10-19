@@ -254,6 +254,15 @@ def test_pkce_plain_method(client):
   assert client.post("/token", data=data).status_code == 200
 
 
+def test_pkce_plain_rejects_non_ascii_verifier(client):
+  code = code_from(client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT,
+                                               "code_challenge": "abc"}))
+  data = {"grant_type": "authorization_code", "code": code, "client_id": CLIENT_ID, "code_verifier": "é"}
+  response = client.post("/token", data=data)
+  assert response.status_code == 400
+  assert response.get_json()["error"] == "invalid_grant"
+
+
 def test_authorize_rejects_unknown_challenge_method(client):
   assert authorize(client, code_challenge="x", code_challenge_method="S512").status_code == 400
 

@@ -107,7 +107,7 @@ def pkce_matches(pkce, verifier):
   if pkce["method"] == "S256":
     digest = hashlib.sha256(verifier.encode()).digest()
     verifier = base64.urlsafe_b64encode(digest).decode().rstrip("=")
-  return hmac.compare_digest(verifier, pkce["challenge"])
+  return hmac.compare_digest(verifier.encode(), pkce["challenge"].encode())
 
 @oidc_bp.route("/healthz")
 def healthz():
