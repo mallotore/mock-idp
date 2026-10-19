@@ -251,6 +251,10 @@ def test_authorize_rejects_unknown_challenge_method(client):
   assert authorize(client, code_challenge="x", code_challenge_method="S512").status_code == 400
 
 
+def test_authorize_rejects_empty_challenge_method(client):
+  assert authorize(client, code_challenge="x", code_challenge_method="").status_code == 400
+
+
 def test_public_client_without_pkce_is_rejected(client):
   data = {"grant_type": "authorization_code", "code": login(client), "client_id": CLIENT_ID}
   assert client.post("/token", data=data).status_code == 401

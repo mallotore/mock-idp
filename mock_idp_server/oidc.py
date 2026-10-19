@@ -163,6 +163,8 @@ def authorize():
     return jsonify({"error": "unauthorized_client"}), 400
 
   pkce, pkce_error = parse_pkce(args)
+  if args.get("code_challenge_method") == "":
+    pkce_error = "unsupported code_challenge_method"
   if pkce_error:
     return jsonify({"error": "invalid_request", "error_description": pkce_error}), 400
 
