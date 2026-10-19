@@ -74,7 +74,10 @@ def purge_expired():
 
 def request_data():
   """Form fields, or a JSON object for clients that post JSON."""
-  return request.form if request.form else request.get_json(silent=True) or {}
+  if request.form:
+    return request.form
+  data = request.get_json(silent=True)
+  return data if isinstance(data, dict) else {}
 
 def client_credentials():
   """Returns (client_id, client_secret) from HTTP Basic auth or the request body."""

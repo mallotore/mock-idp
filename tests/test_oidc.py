@@ -130,6 +130,13 @@ def test_token_accepts_basic_auth(client):
   assert response.status_code == 200
 
 
+@pytest.mark.parametrize("body", [[1], "x", 5])
+def test_token_rejects_non_object_json_body(client, body):
+  response = client.post("/token", json=body)
+  assert response.status_code in (400, 401)
+  assert response.is_json
+
+
 def test_token_rejects_other_grant_types(client):
   assert exchange(client, login(client), grant_type="password").status_code == 400
 
