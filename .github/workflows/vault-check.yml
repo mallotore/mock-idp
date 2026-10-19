@@ -1,0 +1,10 @@
+name: vault-check
+# Real-Vault check: manual, kept out of the default CI.
+on: workflow_dispatch
+
+jobs:
+  vault:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/vault-check.sh

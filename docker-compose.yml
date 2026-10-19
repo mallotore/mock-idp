@@ -1,0 +1,49 @@
+services:
+  mock-idp-server:
+    build:
+      context: .
+      target: runtime
+    environment:
+      # Issuer = how other containers reach the IdP. Public URL = how your browser reaches /authorize.
+      MOCK_IDP_ISSUER: ${MOCK_IDP_ISSUER:-http://127.0.0.1:8081}
+      MOCK_IDP_PUBLIC_URL: ${MOCK_IDP_PUBLIC_URL:-http://127.0.0.1:8081}
+      MOCK_IDP_USERS_FILE: /config/users.json
+      # MOCK_IDP_AUTO_LOGIN: admin@example.com   # skip the login form, handy for CI
+    volumes:
+      - ./config:/config:ro
+    ports:
+      - "127.0.0.1:8081:8081"
+
+  # docker compose run --rm --build test
+  test:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test
+
+  # Real-Vault check, run through scripts/vault-check.sh
+  vault:
+    profiles: ["vault"]
+    image: hashicorp/vault:2.2
+    command: server -dev -dev-root-token-id=roottoken -dev-listen-address=0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 2s
+      retries: 30
+
+  vault-check:
+    profiles: ["vault"]
+    build:
+      context: .
+      target: vault-check
+    depends_on:
+      vault:
+        condition: service_healthy
+      mock-idp-server:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: roottoken
+      IDP_URL: http://mock-idp-server:8081
