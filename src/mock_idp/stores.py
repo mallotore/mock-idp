@@ -4,6 +4,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar
 
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+
+from . import keys
 from .pkce import Pkce
 from .settings import Settings
 from .users import User
@@ -101,6 +104,12 @@ class State:
     self.codes: ExpiringStore[AuthCode] = ExpiringStore(now)
     self.tokens: ExpiringStore[AccessToken] = ExpiringStore(now)
     self.next_user = NextUser()
+    self._signing_key: RSAPrivateKey | None = None
+
+  def signing_key(self) -> RSAPrivateKey:
+    if self._signing_key is None:
+      self._signing_key = keys.load_private_key(self.settings)
+    return self._signing_key
 
   def issue_code(self, user: User, nonce: str | None, redirect_uri: str, pkce: Pkce | None) -> str:
     self.codes.purge()

@@ -1,6 +1,6 @@
 import hmac
 import secrets
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 import jwt
@@ -47,8 +47,9 @@ def redeem_code(data: Mapping[str, Any], state: State) -> AuthCode:
   return entry
 
 
-def build_id_token(user: User, nonce: str | None, settings: Settings, now: Callable[[], float]) -> str:
-  issued_at = int(now())
+def build_id_token(user: User, nonce: str | None, state: State) -> str:
+  settings = state.settings
+  issued_at = int(state.now())
   payload = {
     **identity_claims(user),
     "iss": settings.issuer,
@@ -58,12 +59,12 @@ def build_id_token(user: User, nonce: str | None, settings: Settings, now: Calla
   }
   if nonce:
     payload["nonce"] = nonce
-  return jwt.encode(payload, settings.private_key_path.read_bytes(), algorithm="RS256", headers={"kid": KEY_ID})
+  return jwt.encode(payload, state.signing_key(), algorithm="RS256", headers={"kid": KEY_ID})
 
 
 def issue_tokens(entry: AuthCode, state: State) -> dict[str, Any]:
   settings = state.settings
-  id_token = build_id_token(entry.user, entry.nonce, settings, state.now)
+  id_token = build_id_token(entry.user, entry.nonce, state)
   access_token = secrets.token_urlsafe(24)
   state.tokens.put(access_token, AccessToken(entry.user, state.now() + settings.token_ttl_seconds))
   return {

@@ -41,12 +41,15 @@ def create_keys(settings: Settings) -> None:
     print("RSA keys already exists")
 
 
-def create_jwks_json(settings: Settings) -> None:
-  with open(settings.private_key_path, "rb") as f:
-    private_key = serialization.load_pem_private_key(f.read(), password=None)
+def load_private_key(settings: Settings) -> rsa.RSAPrivateKey:
+  private_key = serialization.load_pem_private_key(settings.private_key_path.read_bytes(), password=None)
   if not isinstance(private_key, rsa.RSAPrivateKey):
     raise KeysError(f"{settings.private_key_path} is not an RSA private key")
-  public_numbers = private_key.public_key().public_numbers()
+  return private_key
+
+
+def create_jwks_json(settings: Settings) -> None:
+  public_numbers = load_private_key(settings).public_key().public_numbers()
 
   jwks = {
     "keys": [
