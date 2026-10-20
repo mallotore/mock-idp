@@ -14,6 +14,13 @@ services:
     ports:
       - "127.0.0.1:8081:8081"
 
+  # docker compose run --rm --build lint   (ruff; add `mypy` to run the type checker instead)
+  lint:
+    profiles: ["test"]
+    build:
+      context: .
+      target: lint
+
   # docker compose run --rm --build test
   test:
     profiles: ["test"]

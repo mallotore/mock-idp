@@ -64,6 +64,7 @@ Everything runs from the repo root and needs only Docker.
 | Run the fast tests only | `docker compose run --rm --build test pytest -m "not e2e" -q` |
 | Run one test file | `docker compose run --rm --build test pytest tests/e2e/test_flow.py -q` |
 | Run tests matching a name | `docker compose run --rm --build test pytest -k pkce -q` |
+| Lint and check formatting (ruff) | `docker compose run --rm --build lint` |
 | Check the real image works | `./scripts/smoke.sh` (builds it, starts it, curls the endpoints) |
 | Check against a real Vault | `./examples/vault/run.sh` (optional, manual in CI) |
 | Add or change users | edit `config/users.json` (re-read on every login, no restart) |
