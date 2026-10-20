@@ -3,18 +3,18 @@ import threading
 import pytest
 from werkzeug.serving import make_server
 
-from mock_idp import prepare_mock_idp
+from mock_idp import keys
 from mock_idp.app import create_app
 from helpers import override_config, reset_state
 
 
 @pytest.fixture(scope="session", autouse=True)
-def keys(tmp_path_factory):
+def signing_keys(tmp_path_factory):
   """Generate a throwaway RSA key pair so tests never touch the real key dir."""
   key_dir = tmp_path_factory.mktemp("keys")
   patch = pytest.MonkeyPatch()
   override_config(patch, KEY_DIR=key_dir, PRIVATE_KEY_PATH=key_dir / "private.pem", JWKS_PATH=key_dir / "jwks.json")
-  prepare_mock_idp.main()
+  keys.main()
   yield
   patch.undo()
 
