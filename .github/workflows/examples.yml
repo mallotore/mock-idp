@@ -14,14 +14,14 @@ concurrency:
 jobs:
   vault:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - run: ./examples/vault/run.sh
 
   grafana:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - run: ./examples/grafana/run.sh
