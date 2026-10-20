@@ -1,24 +1,27 @@
-import json, logging, time
+import json, logging
 from dataclasses import asdict
 from urllib.parse import urlencode
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, send_file
-from . import stores
 from .errors import INVALID_TOKEN, OAuthError
 from .parsing import parse_authorize_request, request_data, require_authorization_code_grant
 from .pkce import PKCE_METHODS, Pkce, parse_pkce
 from .settings import Settings
+from .stores import State
 from .tokens import authenticate_client, issue_tokens, redeem_code
 from .users import User, auto_login_user, build_user, identity_claims, load_users
 
 oidc_bp = Blueprint("oidc", __name__)
 logger = logging.getLogger(__name__)
 
+def app_state() -> State:
+  return current_app.extensions["mock_idp"]
+
 def settings() -> Settings:
-  return current_app.config["MOCK_IDP"]
+  return app_state().settings
 
 def redirect_with_code(redirect_uri: str, state: str | None, nonce: str | None, user: User,
                        pkce: Pkce | None) -> Response:
-  code = stores.issue_code(user, nonce, redirect_uri, pkce, settings().code_ttl_seconds)
+  code = app_state().issue_code(user, nonce, redirect_uri, pkce)
   params = {"code": code}
   if state:
     params["state"] = state
@@ -75,13 +78,13 @@ def set_user() -> Response:
     raise OAuthError("claims must be an object")
 
   user = build_user(email, data.get("groups"), data.get("claims"))
-  stores.set_next_user(user)
+  app_state().next_user.set(user)
   return jsonify({"status": "ok", "user": asdict(user)})
 
 @oidc_bp.route("/authorize")
 def authorize() -> Response | str:
   req = parse_authorize_request(request.args, settings())
-  user = stores.take_next_user() or auto_login_user(settings())
+  user = app_state().next_user.take() or auto_login_user(settings())
   if user:
     return redirect_with_code(req.redirect_uri, req.state, req.nonce, user, req.pkce)
   return render_template("login.html", users=load_users(settings()), redirect_uri=req.redirect_uri, state=req.state,
@@ -115,15 +118,15 @@ def login() -> Response:
 def token() -> Response:
   data = request_data()
   require_authorization_code_grant(data)
-  authenticate_client(data, settings())
-  entry = redeem_code(data)
-  return jsonify(issue_tokens(entry, settings()))
+  authenticate_client(data, app_state())
+  entry = redeem_code(data, app_state())
+  return jsonify(issue_tokens(entry, app_state()))
 
 @oidc_bp.route("/userinfo", methods=["GET", "POST"])
 def userinfo() -> Response:
   auth = request.headers.get("Authorization", "")
-  entry = stores.tokens.get(auth[7:]) if auth.startswith("Bearer ") else None
-  if not entry or time.time() > entry.expires_at:
+  entry = app_state().tokens.get(auth[7:]) if auth.startswith("Bearer ") else None
+  if not entry:
     raise OAuthError(INVALID_TOKEN, status=401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
   return jsonify(identity_claims(entry.user))
 

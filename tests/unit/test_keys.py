@@ -45,3 +45,11 @@ def test_private_key_is_owner_only_and_leaves_no_temp_file(settings, key_dir):
   keys.prepare(settings)
   assert (key_dir / "private.pem").stat().st_mode & 0o777 == 0o600
   assert not list(key_dir.glob("*.tmp"))
+
+
+def test_jwks_document_has_one_rsa_signing_key(settings):
+  keys.prepare(settings)
+  [key] = json.loads(settings.jwks_path.read_text())["keys"]
+  assert set(key) == {"kty", "use", "alg", "kid", "n", "e"}
+  assert (key["kty"], key["use"], key["alg"], key["kid"]) == ("RSA", "sig", "RS256", KEY_ID)
+  assert key["e"] == "AQAB" and "=" not in key["n"]

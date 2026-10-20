@@ -20,7 +20,7 @@ def test_set_user_skips_login_form_once(client):
 
 def test_set_user_accepts_comma_separated_groups(client):
   client.post("/set-user", json={"email": "a@b.c", "groups": "x, y"})
-  assert peek_next_user()["groups"] == ["x", "y"]
+  assert peek_next_user(client)["groups"] == ["x", "y"]
 
 
 def test_set_user_requires_email(client):
@@ -57,4 +57,4 @@ def test_set_user_requires_a_json_content_type(client):
   """A cross-site page can only send simple content types without a preflight."""
   response = client.post("/set-user", data='{"email": "evil@example.com"}', content_type="text/plain")
   assert response.status_code == 400
-  assert peek_next_user() is None
+  assert peek_next_user(client) is None

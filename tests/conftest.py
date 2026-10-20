@@ -7,7 +7,7 @@ from werkzeug.serving import make_server
 from mock_idp import keys
 from mock_idp.app import create_app
 from mock_idp.settings import Settings
-from helpers import reset_state
+from helpers import Clock
 
 
 def pytest_collection_modifyitems(items):
@@ -26,20 +26,25 @@ def base_settings(tmp_path_factory):
   return settings
 
 
-@pytest.fixture(autouse=True)
-def clean_state():
-  reset_state()
+@pytest.fixture
+def clock():
+  return Clock()
 
 
 @pytest.fixture
-def make_app(base_settings):
-  """make_app(token_ttl_seconds=1) builds an app with some settings overridden."""
-  return lambda **overrides: create_app(replace(base_settings, **overrides))
+def make_app(base_settings, clock):
+  """make_app(token_ttl_seconds=1) builds an app with some settings overridden and the test clock."""
+  return lambda **overrides: create_app(replace(base_settings, **overrides), now=clock.now)
 
 
 @pytest.fixture
-def client(make_app):
-  return make_app().test_client()
+def app(make_app):
+  return make_app()
+
+
+@pytest.fixture
+def client(app):
+  return app.test_client()
 
 
 @pytest.fixture(scope="module")

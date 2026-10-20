@@ -40,13 +40,13 @@ def test_login_rejects_unknown_challenge_method(client):
   response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc",
                                          "code_challenge_method": "S512"})
   assert response.status_code == 400
-  assert not stored_codes()
+  assert not stored_codes(client)
 
 
 def test_login_defaults_challenge_method_to_plain(client):
   response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc"})
   assert response.status_code == 302
-  assert stored_pkce() == {"challenge": "abc", "method": "plain"}
+  assert stored_pkce(client) == {"challenge": "abc", "method": "plain"}
 
 
 def test_login_form_without_challenge_method_completes_with_plain_pkce(client):

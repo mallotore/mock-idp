@@ -3,7 +3,7 @@ import base64
 import jwt
 import pytest
 
-from helpers import REDIRECT, CLIENT_ID, CLIENT_SECRET, KEY_ID, code_from, decode, exchange, expire_code, login
+from helpers import REDIRECT, CLIENT_ID, CLIENT_SECRET, KEY_ID, code_from, decode, exchange, expire_codes, login
 
 
 def test_id_token_contains_identity_groups_and_nonce(client):
@@ -30,9 +30,9 @@ def test_code_is_single_use(client):
   assert second.get_json()["error"] == "invalid_grant"
 
 
-def test_expired_code_is_rejected(client):
+def test_expired_code_is_rejected(client, clock):
   code = login(client)
-  expire_code(code)
+  expire_codes(clock)
   assert exchange(client, code).status_code == 400
 
 

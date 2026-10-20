@@ -21,49 +21,58 @@ CLIENT_SECRET = DEFAULTS.client_secret
 KEY_ID = keys.KEY_ID
 
 
-# --- settings and state -------------------------------------------------------------------------
+# --- clock and state ----------------------------------------------------------------------------
 
-def reset_state():
-  stores.codes.clear()
-  stores.tokens.clear()
-  stores.next_user = None
+class Clock:
+  """A clock the tests control; pass clock.now to create_app."""
+
+  def __init__(self, start=None):
+    self.value = time.time() if start is None else start
+
+  def now(self):
+    return self.value
+
+  def advance(self, seconds):
+    self.value += seconds
 
 
-def stored_codes():
+def state_of(client_or_app):
+  """The per-app state (settings, stores) behind a test client or an app."""
+  app = getattr(client_or_app, "application", client_or_app)
+  return app.extensions["mock_idp"]
+
+
+def stored_codes(client):
   """Authorization codes that were issued and not redeemed yet."""
-  return dict(stores.codes)
+  return state_of(client).codes.snapshot()
 
 
-def fill_store(count):
-  """Adds `count` unexpired authorization codes."""
-  expires_at = time.time() + 3600
-  user = build_user("filler@example.com")
-  for i in range(count):
-    stores.codes[f"filler-{i}"] = stores.AuthCode(user, None, REDIRECT, None, expires_at)
-
-
-def stored_pkce():
+def stored_pkce(client):
   """The PKCE parameters saved with the only stored code."""
-  [entry] = stores.codes.values()
+  [entry] = stored_codes(client).values()
   return asdict(entry.pkce)
 
 
-def peek_next_user():
+def peek_next_user(client):
   """The identity seeded by /set-user, without consuming it."""
-  return asdict(stores.next_user) if stores.next_user else None
+  user = state_of(client).next_user.peek()
+  return asdict(user) if user else None
 
 
-def expire_code(code):
-  stores.codes[code].expires_at = time.time() - 1
+def fill_store(client, count):
+  """Adds `count` unexpired authorization codes."""
+  state = state_of(client)
+  user = build_user("filler@example.com")
+  for i in range(count):
+    state.codes.put(f"filler-{i}", stores.AuthCode(user, None, REDIRECT, None, state.now() + 3600))
 
 
-def expire_access_token(token):
-  stores.tokens[token].expires_at = time.time() - 1
+def expire_codes(clock):
+  clock.advance(DEFAULTS.code_ttl_seconds + 1)
 
 
-def set_clock(patch, now):
-  """Makes the application see `now()` as the current time."""
-  patch.setattr(stores.time, "time", now)
+def expire_access_tokens(clock):
+  clock.advance(DEFAULTS.token_ttl_seconds + 1)
 
 
 # --- requests -----------------------------------------------------------------------------------
