@@ -132,9 +132,11 @@ def login() -> RedirectResponse:
 def token() -> Response:
   data = request_data()
   require_authorization_code_grant(data)
-  authenticate_client(data, app_state())
-  entry = redeem_code(data, app_state())
-  return jsonify(issue_tokens(entry, app_state()))
+  state = app_state()
+  authenticate_client(data, state)
+  signing_key = state.signing_key()
+  entry = redeem_code(data, state)
+  return jsonify(issue_tokens(entry, signing_key, state))
 
 
 @oidc_bp.route("/userinfo", methods=["GET", "POST"])

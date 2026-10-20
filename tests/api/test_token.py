@@ -1,9 +1,21 @@
 import base64
+import shutil
 
 import jwt
 import pytest
 
-from helpers import CLIENT_ID, CLIENT_SECRET, KEY_ID, REDIRECT, code_from, decode, exchange, expire_codes, login
+from helpers import (
+  CLIENT_ID,
+  CLIENT_SECRET,
+  KEY_ID,
+  REDIRECT,
+  code_from,
+  decode,
+  exchange,
+  expire_codes,
+  login,
+  stored_codes,
+)
 
 
 def test_id_token_contains_identity_groups_and_nonce(client):
@@ -134,3 +146,12 @@ def test_non_ascii_client_secret_is_a_mismatch_not_an_error(client, secret):
 def test_malformed_basic_auth_header_is_rejected(client):
   response = client.post("/token", data={"code": login(client)}, headers={"Authorization": "Basic !!!not-base64"})
   assert response.status_code == 401
+
+
+def test_an_unreadable_signing_key_fails_before_the_code_is_used(make_app, base_settings, tmp_path):
+  client = make_app(key_dir=tmp_path).test_client()
+  code = login(client)
+  assert exchange(client, code).status_code == 500
+  assert code in stored_codes(client)
+  shutil.copy(base_settings.private_key_path, tmp_path / "private.pem")
+  assert exchange(client, code).status_code == 200

@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import jwt
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
 from .errors import INVALID_CLIENT, INVALID_GRANT, OAuthError
 from .keys import KEY_ID
@@ -47,7 +48,7 @@ def redeem_code(data: Mapping[str, Any], state: State) -> AuthCode:
   return entry
 
 
-def build_id_token(user: User, nonce: str | None, state: State) -> str:
+def build_id_token(user: User, nonce: str | None, signing_key: RSAPrivateKey, state: State) -> str:
   settings = state.settings
   issued_at = int(state.now())
   payload = {
@@ -59,12 +60,12 @@ def build_id_token(user: User, nonce: str | None, state: State) -> str:
   }
   if nonce:
     payload["nonce"] = nonce
-  return jwt.encode(payload, state.signing_key(), algorithm="RS256", headers={"kid": KEY_ID})
+  return jwt.encode(payload, signing_key, algorithm="RS256", headers={"kid": KEY_ID})
 
 
-def issue_tokens(entry: AuthCode, state: State) -> dict[str, Any]:
+def issue_tokens(entry: AuthCode, signing_key: RSAPrivateKey, state: State) -> dict[str, Any]:
   settings = state.settings
-  id_token = build_id_token(entry.user, entry.nonce, state)
+  id_token = build_id_token(entry.user, entry.nonce, signing_key, state)
   access_token = secrets.token_urlsafe(24)
   state.tokens.put(access_token, AccessToken(entry.user, state.now() + settings.token_ttl_seconds))
   return {
