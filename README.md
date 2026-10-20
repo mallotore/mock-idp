@@ -131,6 +131,8 @@ Codes expire after 60 s and are single use. Token responses are sent with `Cache
 - **Scopes do not filter claims**: `/userinfo` returns every claim whatever scopes were requested.
 - Only the authorization-code grant: no refresh tokens, implicit, password or client-credentials grants.
 - No logout (`end_session`) endpoint, no consent screen, no dynamic client registration.
+- No login session: every `/authorize` shows the form again (unless `/set-user` or auto-login applies), and
+  `prompt=none` is ignored.
 - A single static client; `redirect_uri` is optional on `/token` and is not checked against a registered list.
 - `/login` does not re-validate the authorize parameters (see above).
 - Signing keys are not persistent: they are regenerated when the container is recreated.
@@ -168,6 +170,21 @@ tests/e2e/        the full login over real HTTP, Authlib as an independent clien
 examples/vault/   a real-Vault check (run.sh, check.py, compose overlay)
 config/users.json sample users mounted by the compose file
 ```
+
+### Extending
+
+The project stays small on purpose: it covers what an application needs to log in during local development and CI,
+not every OIDC feature. If you need refresh tokens, sessions or several clients, a full IdP such as
+[Dex](https://dexidp.io) fits better. If you need one more thing, these are the places to touch:
+
+- **An endpoint**: add a route to `oidc_bp` in `src/mock_idp/routes.py`. `app_state()` gives the settings and the
+  stores; raise `OAuthError(INVALID_REQUEST, "why")` for a client error and it becomes a JSON error response.
+- **A claim in every token**: `identity_claims` in `src/mock_idp/users.py` builds both the ID token claims and the
+  `/userinfo` response. `RESERVED_CLAIMS` lists the claims extra claims cannot override.
+- **A setting**: add a field with its default to `Settings` in `src/mock_idp/settings.py`, read it in `from_env`,
+  and add a row to the configuration table above.
+- **Tests**: `tests/api/test_<topic>.py` with the `client` fixture for endpoint behaviour; `make_app(**overrides)`
+  builds an app with other settings, `clock` controls time, and `live_server` serves over real HTTP for `tests/e2e/`.
 
 Tests are marked `unit`, `api` or `e2e` by directory, so `pytest -m "not e2e"` is the fast run. Dependencies are
 pinned in `pyproject.toml`; the `test` and `dev` extras add the test and lint tools.
