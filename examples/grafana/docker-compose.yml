@@ -2,20 +2,24 @@ services:
   mock-idp:
     environment:
       MOCK_IDP_ISSUER: http://mock-idp:8081
+      MOCK_IDP_CLIENT_ID: ${MOCK_IDP_CLIENT_ID:-mock-idp-client}
+      MOCK_IDP_CLIENT_SECRET: ${MOCK_IDP_CLIENT_SECRET:-mock-idp-secret}
 
   grafana:
-    image: grafana/grafana:12.3.0
+    image: grafana/grafana:13.2.4
     environment:
       GF_SERVER_ROOT_URL: http://grafana:3000
       GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
       GF_AUTH_GENERIC_OAUTH_NAME: mock-idp
-      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: mock-idp-client
-      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: mock-idp-secret
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${MOCK_IDP_CLIENT_ID:-mock-idp-client}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${MOCK_IDP_CLIENT_SECRET:-mock-idp-secret}
       GF_AUTH_GENERIC_OAUTH_SCOPES: openid email profile
       GF_AUTH_GENERIC_OAUTH_AUTH_URL: http://mock-idp:8081/authorize
       GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://mock-idp:8081/token
       GF_AUTH_GENERIC_OAUTH_API_URL: http://mock-idp:8081/userinfo
       GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH: groups
+      GF_AUTH_GENERIC_OAUTH_ALLOWED_GROUPS: admins@example.com,devs@example.com
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Editor
       GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(groups[*], 'admins@example.com') && 'Admin' || 'Viewer'"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
