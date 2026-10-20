@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,18 @@ def test_every_variable_is_read():
 
 def test_issuer_default_follows_the_port():
   assert Settings.from_env({"MOCK_IDP_PORT": "9999"}).issuer == "http://127.0.0.1:9999"
+  assert Settings(port=9999).issuer == Settings(port=9999).public_url == "http://127.0.0.1:9999"
+
+
+def test_constructor_and_environment_share_the_defaults():
+  assert Settings() == Settings.from_env({})
+
+
+def test_constructor_normalizes_like_the_environment():
+  settings = Settings(issuer="http://idp:8081/", key_dir=Path("relative/keys"))
+  assert settings.issuer == settings.public_url == "http://idp:8081"
+  assert settings.key_dir.is_absolute()
+  assert replace(settings, issuer="http://other/").issuer == "http://other"
 
 
 @pytest.mark.parametrize("name", ["MOCK_IDP_PORT", "MOCK_IDP_CODE_TTL", "MOCK_IDP_TOKEN_TTL"])
