@@ -227,31 +227,29 @@ def login():
   user = build_user(email, form.get("groups"), claims)
   return issue_code_and_redirect(redirect_uri, form.get("state"), form.get("nonce"), user, pkce)
 
-@oidc_bp.route("/token", methods=["POST"])
-def token():
-  data = request_data()
-
+def require_authorization_code_grant(data):
   # JSON clients can send any type; form fields are always strings.
   for name in ("grant_type", "code", "code_verifier", "redirect_uri"):
     if not isinstance(data.get(name, ""), str):
       raise OAuthError("invalid_request", f"{name} must be a string")
-
   if data.get("grant_type", "authorization_code") != "authorization_code":
     raise OAuthError("unsupported_grant_type")
 
-  entry = store.get(data.get("code"))
+def authenticate_client(data):
+  """Checks the client without consuming the code, so a failed attempt leaves it redeemable."""
   client_id, client_secret = client_credentials()
   if client_id != config.CLIENT_ID:
     raise OAuthError("invalid_client", status=401)
   if client_secret is None:
     # Public clients are only accepted when they protect the code with PKCE.
+    entry = store.get(data.get("code"))
     if not (entry and entry["pkce"]):
       raise OAuthError("invalid_client", status=401)
   elif client_secret != config.CLIENT_SECRET:
     raise OAuthError("invalid_client", status=401)
 
-  # Codes are single use and short lived. pop() is atomic, so of several concurrent requests
-  # only one gets the entry; a failed client authentication above leaves the code intact.
+def redeem_code(data):
+  """Codes are single use and short lived. pop() is atomic, so of several concurrent requests only one gets it."""
   entry = store.pop(data.get("code"), None)
   if not entry or time.time() > entry["expires_at"]:
     raise OAuthError("invalid_grant", "code not found or expired")
@@ -259,8 +257,9 @@ def token():
     raise OAuthError("invalid_grant", "redirect_uri mismatch")
   if entry["pkce"] and not pkce_matches(entry["pkce"], data.get("code_verifier")):
     raise OAuthError("invalid_grant", "code_verifier mismatch")
+  return entry
 
-  user = entry["user"]
+def build_id_token(user, nonce):
   now = int(time.time())
   payload = {
     **identity_claims(user),
@@ -269,20 +268,27 @@ def token():
     "exp": now + config.TOKEN_TTL_SECONDS,
     "iat": now,
   }
-  if entry["nonce"]:
-    payload["nonce"] = entry["nonce"]
+  if nonce:
+    payload["nonce"] = nonce
+  return jwt.encode(payload, config.PRIVATE_KEY_PATH.read_bytes(), algorithm="RS256", headers={"kid": config.KEY_ID})
 
-  id_token = jwt.encode(payload, config.PRIVATE_KEY_PATH.read_bytes(), algorithm="RS256",
-                        headers={"kid": config.KEY_ID})
+def issue_tokens(entry):
   access_token = secrets.token_urlsafe(24)
-  tokens[access_token] = {"user": user, "expires_at": time.time() + config.TOKEN_TTL_SECONDS}
-
-  return jsonify({
+  tokens[access_token] = {"user": entry["user"], "expires_at": time.time() + config.TOKEN_TTL_SECONDS}
+  return {
     "access_token": access_token,
-    "id_token": id_token,
+    "id_token": build_id_token(entry["user"], entry["nonce"]),
     "token_type": "Bearer",
     "expires_in": config.TOKEN_TTL_SECONDS,
-  })
+  }
+
+@oidc_bp.route("/token", methods=["POST"])
+def token():
+  data = request_data()
+  require_authorization_code_grant(data)
+  authenticate_client(data)
+  entry = redeem_code(data)
+  return jsonify(issue_tokens(entry))
 
 @oidc_bp.route("/userinfo", methods=["GET", "POST"])
 def userinfo():
