@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -8,8 +9,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from .settings import Settings
 
-KEY_ID = "mock-key-1"
-
 
 class KeysError(Exception):
   pass
@@ -17,6 +16,16 @@ class KeysError(Exception):
 
 def b64url_uint(i: int) -> str:
   return base64.urlsafe_b64encode(i.to_bytes((i.bit_length() + 7) // 8, "big")).decode().rstrip("=")
+
+
+def thumbprint(n: str, e: str) -> str:
+  members = json.dumps({"e": e, "kty": "RSA", "n": n}, separators=(",", ":"))
+  return base64.urlsafe_b64encode(hashlib.sha256(members.encode()).digest()).decode().rstrip("=")
+
+
+def key_id(private_key: rsa.RSAPrivateKey) -> str:
+  numbers = private_key.public_key().public_numbers()
+  return thumbprint(b64url_uint(numbers.n), b64url_uint(numbers.e))
 
 
 def write_private_key_atomically(path: Path, pem: bytes) -> None:
@@ -55,19 +64,8 @@ def load_private_key(settings: Settings) -> rsa.RSAPrivateKey:
 
 def create_jwks_json(settings: Settings) -> None:
   public_numbers = load_private_key(settings).public_key().public_numbers()
-
-  jwks = {
-    "keys": [
-      {
-        "kty": "RSA",
-        "use": "sig",
-        "alg": "RS256",
-        "kid": KEY_ID,
-        "n": b64url_uint(public_numbers.n),
-        "e": b64url_uint(public_numbers.e),
-      }
-    ]
-  }
+  n, e = b64url_uint(public_numbers.n), b64url_uint(public_numbers.e)
+  jwks = {"keys": [{"kty": "RSA", "use": "sig", "alg": "RS256", "kid": thumbprint(n, e), "n": n, "e": e}]}
 
   with open(settings.jwks_path, "w") as f:
     json.dump(jwks, f, indent=2)

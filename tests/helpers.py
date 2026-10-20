@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlparse
 
 import jwt
 
-from mock_idp import keys, stores
+from mock_idp import stores
 from mock_idp.settings import Settings
 from mock_idp.users import build_user
 
@@ -13,7 +13,6 @@ DEFAULTS = Settings()
 ISSUER = DEFAULTS.issuer
 CLIENT_ID = DEFAULTS.client_id
 CLIENT_SECRET = DEFAULTS.client_secret
-KEY_ID = keys.KEY_ID
 
 
 class Clock:

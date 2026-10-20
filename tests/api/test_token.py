@@ -7,7 +7,6 @@ import pytest
 from helpers import (
   CLIENT_ID,
   CLIENT_SECRET,
-  KEY_ID,
   REDIRECT,
   code_from,
   decode,
@@ -25,7 +24,7 @@ def test_id_token_contains_identity_groups_and_nonce(client):
   assert claims["email"] == claims["sub"] == "jane@example.com"
   assert claims["groups"] == ["admins", "devs"]
   assert claims["nonce"] == "nn"
-  assert jwt.get_unverified_header(token)["kid"] == KEY_ID
+  assert jwt.get_unverified_header(token)["kid"] == client.get("/jwks").get_json()["keys"][0]["kid"]
 
 
 def test_token_without_nonce_omits_claim(client):

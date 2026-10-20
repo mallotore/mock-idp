@@ -7,7 +7,7 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
 from .errors import INVALID_CLIENT, INVALID_GRANT, OAuthError
-from .keys import KEY_ID
+from .keys import key_id
 from .parsing import client_credentials
 from .pkce import pkce_matches
 from .settings import Settings
@@ -64,7 +64,7 @@ def build_id_token(user: User, nonce: str | None, signing_key: RSAPrivateKey, st
   }
   if nonce:
     payload["nonce"] = nonce
-  return jwt.encode(payload, signing_key, algorithm="RS256", headers={"kid": KEY_ID})
+  return jwt.encode(payload, signing_key, algorithm="RS256", headers={"kid": key_id(signing_key)})
 
 
 def issue_tokens(entry: AuthCode, signing_key: RSAPrivateKey, state: State) -> dict[str, Any]:

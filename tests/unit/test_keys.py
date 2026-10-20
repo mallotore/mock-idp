@@ -2,11 +2,10 @@ import json
 
 import jwt
 import pytest
+from joserfc.jwk import RSAKey
 
 from mock_idp import keys
 from mock_idp.settings import Settings
-
-from helpers import KEY_ID
 
 
 @pytest.fixture
@@ -23,7 +22,7 @@ def test_creates_key_dir_private_key_and_jwks(settings, key_dir):
   keys.prepare(settings)
   assert (key_dir / "private.pem").exists()
   key = json.loads((key_dir / "jwks.json").read_text())["keys"][0]
-  assert key["kid"] == KEY_ID and key["alg"] == "RS256" and key["use"] == "sig"
+  assert key["alg"] == "RS256" and key["use"] == "sig"
 
 
 def test_jwks_public_key_matches_the_private_key(settings, key_dir):
@@ -70,7 +69,7 @@ def test_jwks_document_has_one_rsa_signing_key(settings):
   keys.prepare(settings)
   [key] = json.loads(settings.jwks_path.read_text())["keys"]
   assert set(key) == {"kty", "use", "alg", "kid", "n", "e"}
-  assert (key["kty"], key["use"], key["alg"], key["kid"]) == ("RSA", "sig", "RS256", KEY_ID)
+  assert (key["kty"], key["use"], key["alg"]) == ("RSA", "sig", "RS256")
   assert key["e"] == "AQAB" and "=" not in key["n"]
 
 
@@ -92,3 +91,18 @@ def test_a_private_key_that_is_not_pem_is_rejected(settings):
   settings.private_key_path.write_text("garbage")
   with pytest.raises(keys.KeysError, match="MOCK_IDP_KEY_DIR"):
     keys.prepare(settings)
+
+
+def test_the_key_id_is_the_rfc_7638_thumbprint(settings):
+  keys.prepare(settings)
+  [key] = json.loads(settings.jwks_path.read_text())["keys"]
+  assert key["kid"] == RSAKey.import_key({"kty": "RSA", "n": key["n"], "e": key["e"]}).thumbprint()
+  assert key["kid"] == keys.key_id(keys.load_private_key(settings))
+
+
+def test_a_new_key_gets_a_new_key_id(tmp_path):
+  first, second = Settings(key_dir=tmp_path / "a"), Settings(key_dir=tmp_path / "b")
+  keys.prepare(first)
+  keys.prepare(second)
+  [first_key], [second_key] = (json.loads(s.jwks_path.read_text())["keys"] for s in (first, second))
+  assert first_key["kid"] != second_key["kid"]

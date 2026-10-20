@@ -76,7 +76,7 @@ Environment variables, set in `docker-compose.yml`. An empty value counts as uns
 | `MOCK_IDP_CODE_TTL` / `MOCK_IDP_TOKEN_TTL` | `60` / `3600` | seconds |
 | `MOCK_IDP_PORT` / `MOCK_IDP_HOST` | `8081` / `127.0.0.1` (`0.0.0.0` in the image) | The compose file publishes on `127.0.0.1` only. If you change the port, change `ports` in `docker-compose.yml` too |
 | `MOCK_IDP_DEBUG` | `false` | Flask debug mode; refused unless `MOCK_IDP_HOST` is loopback |
-| `MOCK_IDP_KEY_DIR` | `./mock_idp_files` (the image uses `/data/keys`) | Keys are regenerated whenever the container is recreated |
+| `MOCK_IDP_KEY_DIR` | `./mock_idp_files` (the image uses `/data/keys`) | Keys are regenerated whenever the container is recreated. The key ID changes with the key, so running apps fetch the new one |
 
 `config/users.json` is re-read on every login, so you can edit it without restarting. Every key other than
 `email` and `groups` becomes a claim:

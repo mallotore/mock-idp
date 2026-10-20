@@ -4,13 +4,13 @@ from dataclasses import replace
 import jwt
 import pytest
 
-from mock_idp import keys
+from mock_idp import keys, tokens
 from mock_idp.errors import OAuthError
 from mock_idp.stores import AuthCode, State
 from mock_idp.tokens import build_id_token, issue_tokens, redeem_code, secret_matches
 from mock_idp.users import User, build_user
 
-from helpers import KEY_ID, REDIRECT
+from helpers import REDIRECT
 
 
 @pytest.fixture
@@ -68,7 +68,8 @@ def test_sub_can_be_overridden(settings, state, signing_key):
 
 def test_the_key_id_is_in_the_header(settings, state, signing_key):
   token = build_id_token(build_user("a@b.c"), None, signing_key, state)
-  assert jwt.get_unverified_header(token)["kid"] == KEY_ID == keys.KEY_ID
+  [jwk] = json.loads(settings.jwks_path.read_text())["keys"]
+  assert jwt.get_unverified_header(token)["kid"] == jwk["kid"]
 
 
 def test_issue_tokens_registers_an_access_token_that_expires(settings, clock, state, signing_key):
@@ -88,9 +89,13 @@ def test_the_signing_key_is_read_once(settings, clock, tmp_path):
   assert state.signing_key() is key
 
 
-def test_issue_tokens_stores_no_access_token_when_signing_fails(clock, state):
-  with pytest.raises(TypeError):
-    issue_tokens(AuthCode(User("a@b.c"), None, REDIRECT, None, clock.now() + 60), None, state)
+def test_issue_tokens_stores_no_access_token_when_signing_fails(clock, state, signing_key, monkeypatch):
+  def fail(*args, **kwargs):
+    raise ValueError("signing failed")
+
+  monkeypatch.setattr(tokens.jwt, "encode", fail)
+  with pytest.raises(ValueError, match="signing failed"):
+    issue_tokens(AuthCode(User("a@b.c"), None, REDIRECT, None, clock.now() + 60), signing_key, state)
   assert not state.tokens.snapshot()
 
 
