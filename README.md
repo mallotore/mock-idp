@@ -157,7 +157,7 @@ Everything runs from the repo root and needs only Docker.
 | Lint and check formatting (ruff) | `docker compose run --rm --build lint` |
 | Type-check (mypy) | `docker compose run --rm --build lint mypy` |
 | Check the real image works | `./scripts/smoke.sh` (builds it, starts it, curls the endpoints) |
-| Check against a real Vault | `./examples/vault/run.sh` (optional, manual in CI) |
+| Check against a real Vault | `./examples/vault/run.sh` (CI runs it every Monday, or by hand) |
 | Add or change users | edit `config/users.json` (re-read on every login, no restart) |
 
 Layout:

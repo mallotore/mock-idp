@@ -20,4 +20,4 @@ vault write auth/oidc/role/identities role_type=oidc user_claim=email groups_cla
 
 `docker-compose.yml` here adds the `vault` and `vault-check` services to the root compose file and sets the IdP's
 issuer to `http://mock-idp:8081`, because Vault reaches the IdP through the compose network. `run.sh` combines the two
-files and runs the check. CI runs it manually (the `examples` workflow).
+files and runs the check. CI runs it every Monday and on demand (the `examples` workflow).
