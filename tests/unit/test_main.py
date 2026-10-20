@@ -23,3 +23,11 @@ def test_missing_users_file_fails_fast(tmp_path):
   with pytest.raises(SystemExit, match="cannot read users file"):
     main({"MOCK_IDP_USERS_FILE": str(tmp_path / "missing.json"), "MOCK_IDP_KEY_DIR": str(tmp_path / "keys")})
   assert not (tmp_path / "keys").exists()
+
+
+def test_unusable_key_dir_stops_start_up_with_a_message_naming_it(tmp_path):
+  key_dir = tmp_path / "keys"
+  key_dir.write_text("not a directory")
+  with pytest.raises(SystemExit) as error:
+    main({"MOCK_IDP_KEY_DIR": str(key_dir)})
+  assert str(error.value).startswith("mock-idp: invalid configuration: cannot prepare keys in MOCK_IDP_KEY_DIR")

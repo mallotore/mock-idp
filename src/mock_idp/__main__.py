@@ -13,9 +13,9 @@ def main(environ: Mapping[str, str] = os.environ) -> None:
   try:
     settings = Settings.from_env(environ)
     validate_users_file(settings)
-  except (ConfigError, UsersFileError) as e:
+    keys.prepare(settings)
+  except (ConfigError, UsersFileError, keys.KeysError) as e:
     raise SystemExit(f"mock-idp: invalid configuration: {e}") from None
-  keys.prepare(settings)
   app = create_app(settings)
   print(f"Mock OIDC IdP server running http://{settings.host}:{settings.port} (issuer {settings.issuer})")
   app.run(host=settings.host, port=settings.port, debug=settings.debug)

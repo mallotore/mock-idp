@@ -45,3 +45,7 @@ def test_authorize_requires_openid_scope(client):
 
 def test_authorize_accepts_code_response_type_and_openid_scope(client):
   assert authorize(client, response_type="code", scope="openid email").status_code == 200
+
+
+def test_authorize_ignores_challenge_method_without_a_challenge(client):
+  assert authorize(client, code_challenge_method="foo").status_code == 200

@@ -18,13 +18,12 @@ class Pkce:
 
 
 def parse_pkce(params: Mapping[str, Any]) -> Pkce | None:
-  method = params.get("code_challenge_method")
-  unsupported = method == "" or method not in (None, *PKCE_METHODS)
-  if unsupported:
-    raise OAuthError(INVALID_REQUEST, "unsupported code_challenge_method")
   challenge = params.get("code_challenge")
   if not challenge:
     return None
+  method = params.get("code_challenge_method")
+  if method == "" or method not in (None, *PKCE_METHODS):
+    raise OAuthError(INVALID_REQUEST, "unsupported code_challenge_method")
   return Pkce(challenge, method or PLAIN)
 
 

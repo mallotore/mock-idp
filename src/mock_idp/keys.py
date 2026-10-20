@@ -11,6 +11,10 @@ from .settings import Settings
 KEY_ID = "mock-key-1"
 
 
+class KeysError(Exception):
+  pass
+
+
 def b64url_uint(i: int) -> str:
   return base64.urlsafe_b64encode(i.to_bytes((i.bit_length() + 7) // 8, "big")).decode().rstrip("=")
 
@@ -41,7 +45,7 @@ def create_jwks_json(settings: Settings) -> None:
   with open(settings.private_key_path, "rb") as f:
     private_key = serialization.load_pem_private_key(f.read(), password=None)
   if not isinstance(private_key, rsa.RSAPrivateKey):
-    raise TypeError(f"{settings.private_key_path} is not an RSA private key")
+    raise KeysError(f"{settings.private_key_path} is not an RSA private key")
   public_numbers = private_key.public_key().public_numbers()
 
   jwks = {
@@ -63,7 +67,10 @@ def create_jwks_json(settings: Settings) -> None:
 
 
 def prepare(settings: Settings) -> None:
-  settings.key_dir.mkdir(parents=True, exist_ok=True)
-  create_keys(settings)
-  create_jwks_json(settings)
+  try:
+    settings.key_dir.mkdir(parents=True, exist_ok=True)
+    create_keys(settings)
+    create_jwks_json(settings)
+  except (OSError, ValueError) as e:
+    raise KeysError(f"cannot prepare keys in MOCK_IDP_KEY_DIR {settings.key_dir}: {e}") from None
   print("Mock IDP server is ready to be used")

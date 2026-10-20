@@ -63,11 +63,12 @@ def build_id_token(user: User, nonce: str | None, settings: Settings, now: Calla
 
 def issue_tokens(entry: AuthCode, state: State) -> dict[str, Any]:
   settings = state.settings
+  id_token = build_id_token(entry.user, entry.nonce, settings, state.now)
   access_token = secrets.token_urlsafe(24)
   state.tokens.put(access_token, AccessToken(entry.user, state.now() + settings.token_ttl_seconds))
   return {
     "access_token": access_token,
-    "id_token": build_id_token(entry.user, entry.nonce, settings, state.now),
+    "id_token": id_token,
     "token_type": "Bearer",
     "expires_in": settings.token_ttl_seconds,
   }

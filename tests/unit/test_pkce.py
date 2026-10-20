@@ -49,3 +49,9 @@ def test_unsupported_or_empty_method_is_an_error(method):
 def test_no_challenge_means_no_pkce():
   assert parse_pkce({}) is None
   assert parse_pkce({"code_challenge": ""}) is None
+
+
+@pytest.mark.parametrize("method", ["S512", ""])
+def test_method_is_ignored_without_a_challenge(method):
+  assert parse_pkce({"code_challenge_method": method}) is None
+  assert parse_pkce({"code_challenge": "", "code_challenge_method": method}) is None

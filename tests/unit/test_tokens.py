@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 import jwt
 import pytest
@@ -68,6 +69,13 @@ def test_issue_tokens_registers_an_access_token_that_expires(settings, clock):
   assert state.tokens.get(response["access_token"]).user.email == "a@b.c"
   clock.advance(settings.token_ttl_seconds + 1)
   assert state.tokens.get(response["access_token"]) is None
+
+
+def test_issue_tokens_stores_no_access_token_when_signing_fails(settings, clock, tmp_path):
+  state = State(replace(settings, key_dir=tmp_path), clock.now)
+  with pytest.raises(OSError):
+    issue_tokens(AuthCode(User("a@b.c"), None, REDIRECT, None, clock.now() + 60), state)
+  assert not state.tokens.snapshot()
 
 
 def test_redeem_code_consumes_it_and_checks_redirect_uri(settings, clock):

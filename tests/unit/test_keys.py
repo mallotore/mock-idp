@@ -65,5 +65,12 @@ def test_a_private_key_that_is_not_rsa_is_rejected(settings):
   settings.private_key_path.write_bytes(
     key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
   )
-  with pytest.raises(TypeError, match="not an RSA private key"):
+  with pytest.raises(keys.KeysError, match="not an RSA private key"):
+    keys.prepare(settings)
+
+
+def test_a_private_key_that_is_not_pem_is_rejected(settings):
+  settings.key_dir.mkdir(parents=True)
+  settings.private_key_path.write_text("garbage")
+  with pytest.raises(keys.KeysError, match="MOCK_IDP_KEY_DIR"):
     keys.prepare(settings)
