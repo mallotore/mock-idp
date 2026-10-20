@@ -29,7 +29,7 @@ def test_extra_claims_from_login_form_reach_id_token_and_userinfo(client):
   tokens = exchange(client, code_from(response))
   claims = decode(client, tokens)
   assert claims["name"] == "Jane Doe" and claims["tier"] == 3
-  assert claims["iss"] == ISSUER  # reserved claims cannot be overridden
+  assert claims["iss"] == ISSUER
 
   info = client.get("/userinfo", headers={"Authorization": f"Bearer {tokens.get_json()['access_token']}"})
   assert info.get_json() == {
@@ -63,7 +63,6 @@ def test_login_defaults_challenge_method_to_plain(client):
 
 
 def test_login_form_without_challenge_method_completes_with_plain_pkce(client):
-  """The hidden fields of the login page, posted back as a browser would, carry a challenge without a method."""
   html = authorize(client, code_challenge="plain-secret").get_data(as_text=True)
   fields = dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)"', html))
   assert "code_challenge_method" not in fields
@@ -86,7 +85,6 @@ def test_login_rejects_empty_challenge_method(client):
 
 
 def test_login_does_not_revalidate_the_authorize_parameters(client):
-  """Documented in the README: posting to /login directly skips the checks /authorize makes."""
   response = client.post(
     "/login",
     data={

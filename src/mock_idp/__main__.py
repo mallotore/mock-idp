@@ -5,14 +5,14 @@ from collections.abc import Mapping
 from . import keys
 from .app import create_app
 from .settings import ConfigError, Settings
-from .users import UsersFileError, load_users
+from .users import UsersFileError, validate_users_file
 
 
 def main(environ: Mapping[str, str] = os.environ) -> None:
   logging.basicConfig(level=logging.INFO, format="%(message)s")
   try:
     settings = Settings.from_env(environ)
-    load_users(settings)  # fails fast on a broken users file, before any key is created
+    validate_users_file(settings)
   except (ConfigError, UsersFileError) as e:
     raise SystemExit(f"mock-idp: invalid configuration: {e}") from None
   keys.prepare(settings)

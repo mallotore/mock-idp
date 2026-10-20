@@ -7,7 +7,7 @@ LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 
 
 class ConfigError(Exception):
-  """A setting is invalid; the message names it."""
+  pass
 
 
 def _int(environ: Mapping[str, str], name: str, default: int) -> int:
@@ -21,20 +21,14 @@ def _int(environ: Mapping[str, str], name: str, default: int) -> int:
 @dataclass(frozen=True)
 class Settings:
   port: int = 8081
-  # Local runs listen on loopback only; the Docker image sets 0.0.0.0 (compose publishes on 127.0.0.1).
   host: str = "127.0.0.1"
-  # URL the relying party (any OIDC application) uses to reach the IdP: discovery, token, jwks.
-  # It is also the `iss` claim, so it must match the discovery URL the client is given.
   issuer: str = "http://127.0.0.1:8081"
-  # URL the user's browser uses to reach /authorize. Differs from the issuer inside docker networks.
   public_url: str = "http://127.0.0.1:8081"
   client_id: str = "mock-idp-client"
   client_secret: str = "mock-idp-secret"
   code_ttl_seconds: int = 60
   token_ttl_seconds: int = 3600
   debug: bool = False
-  # Optional JSON file with predefined users (see config/users.json) and an optional user
-  # (by email) that is logged in automatically, skipping the login form.
   users_file: str | None = None
   auto_login: str | None = None
   key_dir: Path = field(default_factory=lambda: Path("mock_idp_files").resolve())

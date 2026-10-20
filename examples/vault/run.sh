@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Logs in through a real Vault (dev mode) using the mock IdP. Needs only docker.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 

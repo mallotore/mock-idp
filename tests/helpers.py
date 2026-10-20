@@ -1,9 +1,3 @@
-"""Shared test helpers.
-
-Everything the tests need from the application's internals (settings, stored codes and tokens, the clock)
-goes through this module, so a refactor of those internals only touches one place.
-"""
-
 import base64
 import hashlib
 import time
@@ -24,12 +18,7 @@ CLIENT_SECRET = DEFAULTS.client_secret
 KEY_ID = keys.KEY_ID
 
 
-# --- clock and state ----------------------------------------------------------------------------
-
-
 class Clock:
-  """A clock the tests control; pass clock.now to create_app."""
-
   def __init__(self, start=None):
     self.value = time.time() if start is None else start
 
@@ -41,30 +30,25 @@ class Clock:
 
 
 def state_of(client_or_app):
-  """The per-app state (settings, stores) behind a test client or an app."""
   app = getattr(client_or_app, "application", client_or_app)
   return app.extensions["mock_idp"]
 
 
 def stored_codes(client):
-  """Authorization codes that were issued and not redeemed yet."""
   return state_of(client).codes.snapshot()
 
 
 def stored_pkce(client):
-  """The PKCE parameters saved with the only stored code."""
   [entry] = stored_codes(client).values()
   return asdict(entry.pkce)
 
 
 def peek_next_user(client):
-  """The identity seeded by /set-user, without consuming it."""
   user = state_of(client).next_user.peek()
   return asdict(user) if user else None
 
 
 def fill_store(client, count):
-  """Adds `count` unexpired authorization codes."""
   state = state_of(client)
   user = build_user("filler@example.com")
   for i in range(count):
@@ -77,9 +61,6 @@ def expire_codes(clock):
 
 def expire_access_tokens(clock):
   clock.advance(DEFAULTS.token_ttl_seconds + 1)
-
-
-# --- requests -----------------------------------------------------------------------------------
 
 
 def s256(verifier):

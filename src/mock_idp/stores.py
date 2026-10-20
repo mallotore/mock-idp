@@ -32,8 +32,6 @@ class AccessToken:
 
 
 class ExpiringStore(Generic[T]):
-  """Entries that expire, safe to use from several request threads."""
-
   def __init__(self, now: Callable[[], float]):
     self._now = now
     self._items: dict[str, T] = {}
@@ -50,15 +48,13 @@ class ExpiringStore(Generic[T]):
       item = self._items.get(key)
     return item if item and item.expires_at >= self._now() else None
 
-  def peek(self, key: str | None) -> T | None:
-    """Like get(), but also returns an expired entry."""
+  def get_even_if_expired(self, key: str | None) -> T | None:
     if key is None:
       return None
     with self._lock:
       return self._items.get(key)
 
   def take(self, key: str | None) -> T | None:
-    """Removes the entry and returns it if it has not expired. Of concurrent callers only one gets it."""
     if key is None:
       return None
     with self._lock:
@@ -77,8 +73,6 @@ class ExpiringStore(Generic[T]):
 
 
 class NextUser:
-  """Identity used by the next /authorize call, set through POST /set-user (consumed once)."""
-
   def __init__(self) -> None:
     self._user: User | None = None
     self._lock = threading.Lock()
@@ -98,8 +92,6 @@ class NextUser:
 
 
 class State:
-  """Everything one app instance owns: its settings, clock and stores."""
-
   def __init__(self, settings: Settings, now: Callable[[], float]):
     self.settings = settings
     self.now = now

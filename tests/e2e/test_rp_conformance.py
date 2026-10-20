@@ -1,9 +1,3 @@
-"""An independent OIDC client library (Authlib) acting as the relying party.
-
-If the mock deviates from the spec in a way a real client cares about, these fail even when our own
-hand-written requests in test_flow.py would still pass.
-"""
-
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -37,7 +31,6 @@ class RelyingParty:
     return url
 
   def log_in_as(self, email="jane@example.com", groups=("devs",), **kwargs):
-    """Seeds the identity (the "user" at the browser) and follows /authorize to the callback URL."""
     requests.post(f"{self.base}/set-user", json={"email": email, "groups": list(groups)}).raise_for_status()
     response = requests.get(self.authorization_url(**kwargs), allow_redirects=False)
     assert response.status_code == 302, response.text
@@ -49,7 +42,6 @@ class RelyingParty:
     )
 
   def validate_id_token(self, id_token, aud=CLIENT_ID):
-    """Signature through the advertised JWKS, then iss/aud/nonce/exp the way an OIDC client must."""
     keys = KeySet.import_key_set(requests.get(self.doc["jwks_uri"]).json())
     token = jwt.decode(id_token, keys, algorithms=["RS256"])
     jwt.JWTClaimsRegistry(

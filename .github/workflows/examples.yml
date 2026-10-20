@@ -1,5 +1,4 @@
 name: examples
-# Checks against real applications: manual, kept out of the default CI.
 on: workflow_dispatch
 
 permissions:

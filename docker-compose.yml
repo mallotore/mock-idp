@@ -4,24 +4,20 @@ services:
       context: .
       target: runtime
     environment:
-      # Issuer = how other containers reach the IdP. Public URL = how your browser reaches /authorize.
       MOCK_IDP_ISSUER: ${MOCK_IDP_ISSUER:-http://127.0.0.1:8081}
       MOCK_IDP_PUBLIC_URL: ${MOCK_IDP_PUBLIC_URL:-http://127.0.0.1:8081}
       MOCK_IDP_USERS_FILE: /config/users.json
-      # MOCK_IDP_AUTO_LOGIN: admin@example.com   # skip the login form, handy for CI
     volumes:
       - ./config:/config:ro
     ports:
       - "127.0.0.1:8081:8081"
 
-  # docker compose run --rm --build lint   (ruff; add `mypy` to run the type checker instead)
   lint:
     profiles: ["test"]
     build:
       context: .
       target: lint
 
-  # docker compose run --rm --build test
   test:
     profiles: ["test"]
     build:

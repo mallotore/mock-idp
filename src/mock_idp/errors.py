@@ -3,7 +3,6 @@ from flask.typing import ResponseReturnValue
 
 from .users import UsersFileError
 
-# OAuth error codes (RFC 6749 section 5.2, plus this server's invalid_users_file).
 INVALID_REQUEST = "invalid_request"
 INVALID_GRANT = "invalid_grant"
 INVALID_CLIENT = "invalid_client"
@@ -16,8 +15,6 @@ UNAUTHORIZED_CLIENT = "unauthorized_client"
 
 
 class OAuthError(Exception):
-  """An error answered as JSON: {"error": ..., "error_description": ...} (description omitted when empty)."""
-
   def __init__(self, error: str, description: str = "", status: int = 400, headers: dict[str, str] | None = None):
     super().__init__(error)
     self.error, self.description, self.status, self.headers = error, description, status, headers or {}
@@ -31,7 +28,6 @@ def oauth_error(error: OAuthError) -> ResponseReturnValue:
 
 
 def users_file_error(error: UsersFileError) -> ResponseReturnValue:
-  """A users file broken while the server runs is reported to the caller, not by dropping the request."""
   return oauth_error(OAuthError(INVALID_USERS_FILE, str(error), status=500))
 
 

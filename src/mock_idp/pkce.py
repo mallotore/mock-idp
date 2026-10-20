@@ -18,12 +18,9 @@ class Pkce:
 
 
 def parse_pkce(params: Mapping[str, Any]) -> Pkce | None:
-  """Returns the PKCE parameters from /authorize query args or /login form fields; None without a challenge.
-
-  An absent code_challenge_method means "plain"; an empty or unknown one is an error.
-  """
   method = params.get("code_challenge_method")
-  if method == "" or method not in (None, *PKCE_METHODS):
+  unsupported = method == "" or method not in (None, *PKCE_METHODS)
+  if unsupported:
     raise OAuthError(INVALID_REQUEST, "unsupported code_challenge_method")
   challenge = params.get("code_challenge")
   if not challenge:

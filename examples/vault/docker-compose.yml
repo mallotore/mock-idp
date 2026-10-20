@@ -1,9 +1,6 @@
-# Combined with the root compose file by run.sh:
-#   docker compose -f docker-compose.yml -f examples/vault/docker-compose.yml ...
 services:
   mock-idp:
     environment:
-      # Vault resolves the IdP through the compose network, so the issuer must be the service name.
       MOCK_IDP_ISSUER: http://mock-idp:8081
 
   vault:

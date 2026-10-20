@@ -59,7 +59,7 @@ services:
 - `POST /set-user` (`Content-Type: application/json`) with
   `{"email": "bot@example.com", "groups": ["ci"], "claims": {"name": "Bot"}}`: the **next** login uses that
   identity, once.
-- or set `MOCK_IDP_AUTO_LOGIN=admin@example.com` (see `docker-compose.yml`): every login is that user.
+- or set `MOCK_IDP_AUTO_LOGIN=admin@example.com` (under `environment` in `docker-compose.yml`): every login is that user.
   `/set-user` wins over it for the next login.
 
 ## Configuration

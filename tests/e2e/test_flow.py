@@ -1,5 +1,3 @@
-"""The full login over real HTTP, the way a browser and a relying party would do it."""
-
 import re
 from urllib.parse import parse_qs, urlparse
 
@@ -14,7 +12,6 @@ def discovery(base):
 
 
 def hidden_fields(html):
-  """What a browser would submit back: the form's hidden inputs."""
   return dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)"', html))
 
 
@@ -24,7 +21,6 @@ def query_of(response):
 
 
 def browser_login(base, email="jane@example.com", groups="devs", claims="", **authorize_params):
-  """GET /authorize, fill the form, POST /login. Returns the redirect's query (code, state)."""
   params = {"client_id": CLIENT_ID, "redirect_uri": REDIRECT, "state": "xyz", "nonce": "n-1", **authorize_params}
   page = requests.get(discovery(base)["authorization_endpoint"], params=params)
   assert page.status_code == 200 and "Mock OIDC Login" in page.text
@@ -44,8 +40,7 @@ def token_request(base, code, **extra):
   return requests.post(discovery(base)["token_endpoint"], data=data)
 
 
-def verified_claims(base, id_token):
-  """Verifies the signature using only what discovery advertises."""
+def claims_verified_through_discovery(base, id_token):
   key = jwt.PyJWKClient(discovery(base)["jwks_uri"]).get_signing_key_from_jwt(id_token)
   return jwt.decode(id_token, key.key, algorithms=["RS256"], audience=CLIENT_ID, issuer=discovery(base)["issuer"])
 
@@ -56,7 +51,7 @@ def test_browser_login_returns_a_verifiable_id_token(live_server):
 
   response = token_request(live_server, query["code"][0])
   assert response.status_code == 200
-  claims = verified_claims(live_server, response.json()["id_token"])
+  claims = claims_verified_through_discovery(live_server, response.json()["id_token"])
   assert claims["email"] == "jane@example.com"
   assert claims["groups"] == ["admins", "devs"]
   assert claims["name"] == "Jane"
@@ -76,7 +71,9 @@ def test_set_user_skips_the_form_and_is_consumed_once(live_server):
   params = {"client_id": CLIENT_ID, "redirect_uri": REDIRECT, "state": "s", "nonce": "n"}
 
   query = query_of(requests.get(authorize_url, params=params, allow_redirects=False))
-  claims = verified_claims(live_server, token_request(live_server, query["code"][0]).json()["id_token"])
+  claims = claims_verified_through_discovery(
+    live_server, token_request(live_server, query["code"][0]).json()["id_token"]
+  )
   assert claims["email"] == "bot@example.com" and claims["groups"] == ["ci"]
 
   assert requests.get(authorize_url, params=params, allow_redirects=False).status_code == 200

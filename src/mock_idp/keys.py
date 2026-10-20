@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -14,6 +15,14 @@ def b64url_uint(i: int) -> str:
   return base64.urlsafe_b64encode(i.to_bytes((i.bit_length() + 7) // 8, "big")).decode().rstrip("=")
 
 
+def write_private_key_atomically(path: Path, pem: bytes) -> None:
+  tmp = path.with_suffix(".tmp")
+  fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+  with os.fdopen(fd, "wb") as f:
+    f.write(pem)
+  os.replace(tmp, path)
+
+
 def create_keys(settings: Settings) -> None:
   if not settings.private_key_path.exists():
     print("Creating new private key (RSA 2048)")
@@ -23,12 +32,7 @@ def create_keys(settings: Settings) -> None:
       serialization.PrivateFormat.TraditionalOpenSSL,
       serialization.NoEncryption(),
     )
-    # Owner-only, written to a temp file and renamed so a crash never leaves a truncated key.
-    tmp = settings.private_key_path.with_suffix(".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "wb") as f:
-      f.write(pem)
-    os.replace(tmp, settings.private_key_path)
+    write_private_key_atomically(settings.private_key_path, pem)
   else:
     print("RSA keys already exists")
 

@@ -38,10 +38,10 @@ def test_an_entry_is_valid_until_its_expiry_time(store, clock):
   assert store.get("k") is not None
 
 
-def test_peek_also_returns_expired_entries(store, clock):
+def test_get_even_if_expired_also_returns_expired_entries(store, clock):
   item = Item(clock.now() - 1)
   store.put("k", item)
-  assert store.peek("k") is item and store.get("k") is None
+  assert store.get_even_if_expired("k") is item and store.get("k") is None
 
 
 def test_purge_removes_only_expired_entries(store, clock):
@@ -105,4 +105,4 @@ def test_issue_code_stores_the_code_with_its_ttl_and_purges_expired_ones(clock):
 
 
 def test_a_missing_key_is_never_found(store):
-  assert store.get(None) is None and store.peek(None) is None and store.take(None) is None
+  assert store.get(None) is None and store.get_even_if_expired(None) is None and store.take(None) is None

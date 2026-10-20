@@ -20,22 +20,23 @@ def secret_matches(given: Any, settings: Settings) -> bool:
   return hmac.compare_digest(given.encode(), settings.client_secret.encode())
 
 
+def is_pkce_protected(data: Mapping[str, Any], state: State) -> bool:
+  entry = state.codes.get_even_if_expired(data.get("code"))
+  return bool(entry and entry.pkce)
+
+
 def authenticate_client(data: Mapping[str, Any], state: State) -> None:
-  """Checks the client without consuming the code, so a failed attempt leaves it redeemable."""
   client_id, client_secret = client_credentials()
   if client_id != state.settings.client_id:
     raise OAuthError(INVALID_CLIENT, status=401)
   if client_secret is None:
-    # Public clients are only accepted when they protect the code with PKCE.
-    entry = state.codes.peek(data.get("code"))
-    if not (entry and entry.pkce):
+    if not is_pkce_protected(data, state):
       raise OAuthError(INVALID_CLIENT, status=401)
   elif not secret_matches(client_secret, state.settings):
     raise OAuthError(INVALID_CLIENT, status=401)
 
 
 def redeem_code(data: Mapping[str, Any], state: State) -> AuthCode:
-  """Codes are single use and short lived. pop() is atomic, so of several concurrent requests only one gets it."""
   entry = state.codes.take(data.get("code"))
   if not entry:
     raise OAuthError(INVALID_GRANT, "code not found or expired")

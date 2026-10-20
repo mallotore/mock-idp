@@ -1,8 +1,3 @@
-"""Configures a dev Vault to use the mock IdP and performs real OIDC logins through it.
-
-Runs inside docker compose (see run.sh). Only talks to Vault's HTTP API.
-"""
-
 import os
 import sys
 import time
@@ -62,8 +57,12 @@ def configure_vault():
     vault("POST", "identity/group-alias", json={"name": name, "mount_accessor": accessor, "canonical_id": group_id})
 
 
-def login(email, groups):
-  """Same flow as `vault login -method=oidc`; /set-user stands in for the person at the browser."""
+def idp_path(auth_url):
+  authorize = urlparse(auth_url)
+  return authorize._replace(scheme="", netloc="").geturl()
+
+
+def login_through_vault(email, groups):
   nonce = f"nonce-{time.time_ns()}"
   auth_url = requests.post(
     f"{VAULT}/v1/auth/oidc/oidc/auth_url", json={"role": "identities", "redirect_uri": REDIRECT, "client_nonce": nonce}
@@ -71,10 +70,7 @@ def login(email, groups):
   auth_url.raise_for_status()
 
   requests.post(f"{IDP}/set-user", json={"email": email, "groups": groups}).raise_for_status()
-  # The URL Vault returns points at the IdP's public address (for a browser); reach it via the compose network.
-  authorize = urlparse(auth_url.json()["data"]["auth_url"])
-  path_and_query = authorize._replace(scheme="", netloc="").geturl()
-  redirect = requests.get(f"{IDP}{path_and_query}", allow_redirects=False)
+  redirect = requests.get(f"{IDP}{idp_path(auth_url.json()['data']['auth_url'])}", allow_redirects=False)
   assert redirect.status_code == 302, redirect.text
   query = parse_qs(urlparse(redirect.headers["Location"]).query)
 
@@ -105,22 +101,22 @@ def main():
 
   configure_vault()
 
-  admin = login("alice@example.com", ["admins@example.com"])
+  admin = login_through_vault("alice@example.com", ["admins@example.com"])
   check(
     "admin group logs in with both policies",
     admin.ok and set(admin.json()["auth"]["identity_policies"]) == {"admin-policy", "engineer-policy"},
   )
 
-  dev = login("bob@example.com", ["devs@example.com"])
+  dev = login_through_vault("bob@example.com", ["devs@example.com"])
   check(
     "dev group logs in with engineer-policy only",
     dev.ok and dev.json()["auth"]["identity_policies"] == ["engineer-policy"],
   )
 
-  unmapped = login("carol@example.com", ["unknown@example.com"])
+  unmapped = login_through_vault("carol@example.com", ["unknown@example.com"])
   check("unmapped group is rejected", unmapped.status_code == 400 and "bound claim" in unmapped.text)
 
-  nogroups = login("erin@example.com", [])
+  nogroups = login_through_vault("erin@example.com", [])
   check("missing groups claim is rejected", nogroups.status_code == 400)
 
   sys.exit(1 if check.failed else 0)

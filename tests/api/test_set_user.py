@@ -14,7 +14,6 @@ def test_set_user_skips_login_form_once(client):
   claims = jwt.decode(token, options={"verify_signature": False})
   assert claims["email"] == "bot@example.com" and claims["groups"] == ["ci"]
 
-  # The seeded identity is consumed: the next login shows the form again.
   assert authorize(client).status_code == 200
 
 
@@ -54,7 +53,6 @@ def test_set_user_tolerates_non_string_groups(client):
 
 
 def test_set_user_requires_a_json_content_type(client):
-  """A cross-site page can only send simple content types without a preflight."""
   response = client.post("/set-user", data='{"email": "evil@example.com"}', content_type="text/plain")
   assert response.status_code == 400
   assert peek_next_user(client) is None

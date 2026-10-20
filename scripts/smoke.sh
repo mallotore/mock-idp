@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Builds the real image, starts it and checks it answers. Catches packaging bugs unit tests cannot
-# (missing templates, wrong paths, non-root permissions). Needs docker and curl.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,5 +11,5 @@ curl -fsS "$base/.well-known/openid-configuration" | grep '"issuer"' >/dev/null
 curl -fsS "$base/jwks" | grep '"keys"' >/dev/null
 login_page=$(curl -fsS "$base/authorize?redirect_uri=http://localhost/cb")
 grep "Mock OIDC Login" <<<"$login_page" >/dev/null
-grep "admin@example.com" <<<"$login_page" >/dev/null   # users.json mounted
+grep "admin@example.com" <<<"$login_page" >/dev/null
 echo "smoke test passed"

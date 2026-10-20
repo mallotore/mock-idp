@@ -48,7 +48,6 @@ def test_concurrent_logins_do_not_fail_while_purging(app):
 
 
 def test_seeded_identities_are_each_consumed_at_most_once(app):
-  """Several /authorize calls race for one /set-user identity: exactly one of them gets it."""
   for round_number in range(20):
     email = f"user{round_number}@example.com"
     app.test_client().post("/set-user", json={"email": email})

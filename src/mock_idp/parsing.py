@@ -19,7 +19,6 @@ from .settings import Settings
 
 
 def request_data() -> Mapping[str, Any]:
-  """Form fields, or a JSON object for clients that post JSON."""
   if request.form:
     return request.form
   data = request.get_json(silent=True)
@@ -27,13 +26,12 @@ def request_data() -> Mapping[str, Any]:
 
 
 def client_credentials() -> tuple[Any, Any]:
-  """Returns (client_id, client_secret) from HTTP Basic auth or the request body."""
   auth = request.headers.get("Authorization", "")
   if auth.startswith("Basic "):
     try:
       client_id, _, secret = base64.b64decode(auth[6:]).decode().partition(":")
       return unquote_plus(client_id), unquote_plus(secret)
-    except ValueError:  # bad base64 or not UTF-8
+    except ValueError:
       return None, None
   data = request_data()
   return data.get("client_id"), data.get("client_secret")
@@ -69,10 +67,13 @@ def parse_authorize_request(args: Mapping[str, str], settings: Settings) -> Auth
   )
 
 
-def require_authorization_code_grant(data: Mapping[str, Any]) -> None:
-  # JSON clients can send any type; form fields are always strings.
+def reject_non_string_parameters(data: Mapping[str, Any]) -> None:
   for name in ("grant_type", "code", "code_verifier", "redirect_uri"):
     if not isinstance(data.get(name, ""), str):
       raise OAuthError(INVALID_REQUEST, f"{name} must be a string")
+
+
+def require_authorization_code_grant(data: Mapping[str, Any]) -> None:
+  reject_non_string_parameters(data)
   if data.get("grant_type", "authorization_code") != "authorization_code":
     raise OAuthError(UNSUPPORTED_GRANT_TYPE)

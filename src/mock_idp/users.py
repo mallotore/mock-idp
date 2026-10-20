@@ -8,10 +8,9 @@ from .settings import Settings
 
 
 class UsersFileError(Exception):
-  """The users file is unreadable or malformed."""
+  pass
 
 
-# Claims a user can never override through `claims` or the users file.
 RESERVED_CLAIMS = {"iss", "aud", "exp", "iat", "nonce"}
 
 
@@ -34,12 +33,10 @@ def build_user(email: str, groups: Any = None, claims: Mapping[str, Any] | None 
 
 
 def identity_claims(user: User) -> dict[str, Any]:
-  """Claims describing the user, shared by the ID token and /userinfo."""
   return {"sub": user.email, "email": user.email, "groups": user.groups, **user.claims}
 
 
 def load_users(settings: Settings) -> list[User]:
-  """Reads the users file on every call so it can be edited without restarting."""
   if not settings.users_file:
     return []
   try:
@@ -62,3 +59,7 @@ def auto_login_user(settings: Settings) -> User | None:
   if not settings.auto_login:
     return None
   return next((u for u in load_users(settings) if u.email == settings.auto_login), build_user(settings.auto_login))
+
+
+def validate_users_file(settings: Settings) -> None:
+  load_users(settings)

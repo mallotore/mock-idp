@@ -1,5 +1,3 @@
-"""The real start-up path: python -m mock_idp in a subprocess."""
-
 import socket
 import subprocess
 import sys

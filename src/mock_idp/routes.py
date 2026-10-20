@@ -40,7 +40,6 @@ def redirect_with_code(
 
 @oidc_bp.after_request
 def no_store_token_responses(response: Response) -> Response:
-  """RFC 6749 section 5.1: token responses must not be cached."""
   if request.path == "/token":
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
@@ -75,11 +74,6 @@ def well_known() -> Response:
 
 @oidc_bp.route("/set-user", methods=["POST"])
 def set_user() -> Response:
-  """Pre-seeds the identity of the next login so tests can skip the login form.
-
-  Body: {"email": "...", "groups": ["a", "b"], "claims": {"name": "Jane"}}
-  """
-  # No force=True: requiring a JSON Content-Type makes browsers preflight cross-site requests.
   data = request.get_json(silent=True)
   if not isinstance(data, dict):
     raise OAuthError("body must be a JSON object")
@@ -115,8 +109,6 @@ def authorize() -> Response | RedirectResponse | str:
 
 @oidc_bp.route("/login", methods=["POST"])
 def login() -> RedirectResponse:
-  # Deliberately permissive: only what is needed to issue a code is checked, not client_id, response_type or
-  # scope (see "Not secure by design" in the README).
   form = request.form
   email = form.get("email")
   redirect_uri = form.get("redirect_uri")

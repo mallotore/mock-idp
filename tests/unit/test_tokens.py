@@ -75,7 +75,7 @@ def test_redeem_code_consumes_it_and_checks_redirect_uri(settings, clock):
   code = state.issue_code(User("a@b.c"), None, REDIRECT, None)
   with pytest.raises(OAuthError, match="invalid_grant"):
     redeem_code({"code": code, "redirect_uri": "http://evil/cb"}, state)
-  with pytest.raises(OAuthError, match="invalid_grant"):  # the failed attempt consumed it
+  with pytest.raises(OAuthError, match="invalid_grant"):
     redeem_code({"code": code}, state)
 
 

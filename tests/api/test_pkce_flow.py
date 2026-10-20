@@ -6,7 +6,6 @@ from helpers import CLIENT_ID, REDIRECT, authorize, code_from, login, s256
 def test_pkce_s256_public_client(client):
   verifier = "v" * 50
   response = authorize(client, code_challenge=s256(verifier), code_challenge_method="S256")
-  # The login form carries the challenge through to /login.
   html = response.get_data(as_text=True)
   assert f'name="code_challenge" value="{s256(verifier)}"' in html
   login_response = client.post(
