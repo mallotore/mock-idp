@@ -4,6 +4,7 @@ from dataclasses import replace
 import pytest
 from werkzeug.serving import make_server
 
+from mock_idp import keys
 from mock_idp.app import create_app
 from mock_idp.settings import Settings
 from helpers import reset_state
@@ -20,7 +21,9 @@ def pytest_collection_modifyitems(items):
 @pytest.fixture(scope="session")
 def base_settings(tmp_path_factory):
   """Default settings with a throwaway key directory, so tests never touch the real one."""
-  return Settings(key_dir=tmp_path_factory.mktemp("keys"))
+  settings = Settings(key_dir=tmp_path_factory.mktemp("keys"))
+  keys.prepare(settings)
+  return settings
 
 
 @pytest.fixture(autouse=True)

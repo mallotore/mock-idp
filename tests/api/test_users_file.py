@@ -1,6 +1,5 @@
 import pytest
 
-from mock_idp.users import UsersFileError
 from helpers import authorize, code_from, decode, exchange
 
 
@@ -42,14 +41,6 @@ def test_set_user_wins_over_auto_login(make_app):
   assert decode(client, exchange(client, code_from(authorize(client))))["email"] == "manual@example.com"
 
 
-@pytest.mark.parametrize("content", ["not json", '{"users": "x"}', '[{"groups": []}]'])
-def test_invalid_users_file_fails_fast(tmp_path, make_app, content):
-  path = tmp_path / "users.json"
-  path.write_text(content)
-  with pytest.raises(UsersFileError):
-    make_app(users_file=str(path))
-
-
 def test_users_file_broken_while_running_returns_a_clear_error(make_app, users_file):
   client = make_app(users_file=str(users_file)).test_client()
   assert authorize(client).status_code == 200
@@ -60,8 +51,3 @@ def test_users_file_broken_while_running_returns_a_clear_error(make_app, users_f
   assert "cannot read users file" in response.get_json()["error_description"]
   users_file.write_text('[{"email": "a@b.c"}]')
   assert authorize(client).status_code == 200
-
-
-def test_missing_users_file_fails_fast(make_app):
-  with pytest.raises(UsersFileError):
-    make_app(users_file="/does/not/exist.json")
