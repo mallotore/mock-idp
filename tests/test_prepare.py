@@ -4,8 +4,8 @@ import subprocess, sys
 import jwt
 import pytest
 
-import prepare_mock_idp
-from helpers import KEY_ID, SERVER_DIR
+from mock_idp import prepare_mock_idp
+from helpers import KEY_ID
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def test_second_run_reuses_the_existing_key(key_dir):
 
 
 def run_config(**env):
-  return subprocess.run([sys.executable, "-c", "import config"], cwd=SERVER_DIR, capture_output=True,
+  return subprocess.run([sys.executable, "-c", "from mock_idp import config"], capture_output=True,
                         text=True, env={"PATH": "/usr/bin:/bin", **env})
 
 
@@ -56,7 +56,7 @@ def test_valid_settings_import_cleanly():
 
 
 def test_bad_users_file_fails_before_any_key_is_created(tmp_path):
-  result = subprocess.run([sys.executable, "app.py"], cwd=SERVER_DIR, capture_output=True, text=True,
+  result = subprocess.run([sys.executable, "-m", "mock_idp"], capture_output=True, text=True,
                           env={"PATH": "/usr/bin:/bin", "MOCK_IDP_USERS_FILE": str(tmp_path / "missing.json"),
                                "MOCK_IDP_KEY_DIR": str(tmp_path / "keys")})
   assert result.returncode != 0
@@ -72,16 +72,22 @@ def test_private_key_is_owner_only_and_leaves_no_temp_file(key_dir):
 
 
 def test_key_dir_is_made_absolute(tmp_path):
-  result = subprocess.run([sys.executable, "-c", "import config; print(config.JWKS_PATH.is_absolute())"],
-                          cwd=SERVER_DIR, capture_output=True, text=True,
+  result = subprocess.run([sys.executable, "-c", "from mock_idp import config; print(config.JWKS_PATH.is_absolute())"],
+                          capture_output=True, text=True,
                           env={"PATH": "/usr/bin:/bin", "MOCK_IDP_KEY_DIR": "relative/keys"})
   assert result.stdout.strip() == "True"
 
 
+def test_default_key_dir_is_mock_idp_files_in_the_working_directory(tmp_path):
+  result = subprocess.run([sys.executable, "-c", "from mock_idp import config; print(config.KEY_DIR)"],
+                          cwd=tmp_path, capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"})
+  assert result.stdout.strip() == str(tmp_path.resolve() / "mock_idp_files")
+
+
 def test_create_app_generates_the_keys(tmp_path):
   keys = tmp_path / "keys"
-  result = subprocess.run([sys.executable, "-c", "from app import create_app; create_app()"],
-                          cwd=SERVER_DIR, capture_output=True, text=True,
+  result = subprocess.run([sys.executable, "-c", "from mock_idp.app import create_app; create_app()"],
+                          capture_output=True, text=True,
                           env={"PATH": "/usr/bin:/bin", "MOCK_IDP_KEY_DIR": str(keys)})
   assert result.returncode == 0, result.stderr
   assert (keys / "private.pem").exists() and (keys / "jwks.json").exists()

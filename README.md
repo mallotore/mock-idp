@@ -43,10 +43,10 @@ Two URLs are involved: containers reach the IdP by its service name, your browse
 
 ```yaml
 services:
-  mock-idp-server:
+  mock-idp:
     build: ./mock-idp
     environment:
-      MOCK_IDP_ISSUER: http://mock-idp-server:8081      # what your app container uses as issuer / discovery URL
+      MOCK_IDP_ISSUER: http://mock-idp:8081             # what your app container uses as issuer / discovery URL
       MOCK_IDP_PUBLIC_URL: http://127.0.0.1:8081        # what your browser uses for /authorize
     ports: ["127.0.0.1:8081:8081"]
 ```
@@ -107,7 +107,7 @@ Environment variables, set in `docker-compose.yml`:
 | `MOCK_IDP_CODE_TTL` / `MOCK_IDP_TOKEN_TTL` | `60` / `3600` | seconds |
 | `MOCK_IDP_PORT` / `MOCK_IDP_HOST` | `8081` / `127.0.0.1` (`0.0.0.0` in the image) | The compose file publishes on `127.0.0.1` only. If you change the port, change `ports` in `docker-compose.yml` too |
 | `MOCK_IDP_DEBUG` | `false` | Flask debug mode; refused unless `MOCK_IDP_HOST` is loopback |
-| `MOCK_IDP_KEY_DIR` | `mock_idp_server/mock_idp_files` | Keys are regenerated whenever the container is recreated |
+| `MOCK_IDP_KEY_DIR` | `./mock_idp_files` (the image uses `/data/keys`) | Keys are regenerated whenever the container is recreated |
 
 `config/users.json` is re-read on every login, so you can edit it without restarting. Every key other than
 `email` and `groups` becomes a claim:
@@ -125,7 +125,7 @@ the server is running, `/authorize` answers `500` with `invalid_users_file` and 
 
 ```sh
 vault auth enable oidc
-vault write auth/oidc/config oidc_discovery_url=http://mock-idp-server:8081 \
+vault write auth/oidc/config oidc_discovery_url=http://mock-idp:8081 \
   oidc_client_id=vault-oidc-client-id oidc_client_secret=vault-oidc-client-secret default_role=identities
 vault write auth/oidc/role/identities role_type=oidc user_claim=email groups_claim=groups \
   oidc_scopes=openid,email bound_audiences=vault-oidc-client-id \

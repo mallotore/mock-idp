@@ -38,8 +38,7 @@ if DEBUG and HOST not in ("127.0.0.1", "localhost", "::1"):
 USERS_FILE = os.getenv("MOCK_IDP_USERS_FILE") or None
 AUTO_LOGIN = os.getenv("MOCK_IDP_AUTO_LOGIN") or None
 
-BASE_DIR = Path(__file__).parent
-KEY_DIR = Path(os.getenv("MOCK_IDP_KEY_DIR", BASE_DIR / "mock_idp_files")).resolve()
+KEY_DIR = Path(os.getenv("MOCK_IDP_KEY_DIR", "mock_idp_files")).resolve()
 PRIVATE_KEY_PATH = KEY_DIR / "private.pem"
 JWKS_PATH = KEY_DIR / "jwks.json"
 KEY_ID = "mock-key-1"

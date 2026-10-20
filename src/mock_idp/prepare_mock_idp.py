@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
 import json, base64, os
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-import config
+from . import config
 
 def b64url_uint(i: int) -> str:
   return base64.urlsafe_b64encode(i.to_bytes((i.bit_length() + 7) // 8, "big")).decode().rstrip("=")

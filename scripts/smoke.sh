@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 trap 'docker compose down -v' EXIT
-docker compose up -d --build --wait mock-idp-server
+docker compose up -d --build --wait mock-idp
 
 base=http://127.0.0.1:8081
 curl -fsS "$base/healthz" | grep ok >/dev/null

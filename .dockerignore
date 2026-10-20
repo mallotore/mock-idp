@@ -4,4 +4,4 @@
 .venv
 .pytest_cache
 **/__pycache__
-mock_idp_server/mock_idp_files
+mock_idp_files

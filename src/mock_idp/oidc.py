@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode, unquote_plus
 from flask import Blueprint, request, jsonify, redirect, render_template, send_file
-import config
+from . import config
 
 oidc_bp = Blueprint("oidc", __name__)
 logger = logging.getLogger(__name__)

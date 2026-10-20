@@ -1,5 +1,5 @@
 services:
-  mock-idp-server:
+  mock-idp:
     build:
       context: .
       target: runtime
@@ -41,9 +41,9 @@ services:
     depends_on:
       vault:
         condition: service_healthy
-      mock-idp-server:
+      mock-idp:
         condition: service_healthy
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: roottoken
-      IDP_URL: http://mock-idp-server:8081
+      IDP_URL: http://mock-idp:8081

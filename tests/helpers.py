@@ -4,20 +4,17 @@ Everything the tests need from the application's internals (settings, stored cod
 goes through this module, so a refactor of those internals only touches one place.
 """
 import base64, hashlib, time
-from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 import jwt
 
-import config
-import oidc
+from mock_idp import config, oidc
 
 REDIRECT = "http://localhost:8250/oidc/callback"
 ISSUER = config.ISSUER
 CLIENT_ID = config.CLIENT_ID
 CLIENT_SECRET = config.CLIENT_SECRET
 KEY_ID = config.KEY_ID
-SERVER_DIR = Path(config.__file__).parent
 
 
 # --- settings and state -------------------------------------------------------------------------

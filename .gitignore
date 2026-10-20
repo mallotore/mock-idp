@@ -3,3 +3,6 @@
 __pycache__/
 .pytest_cache/
 mock_idp_files/
+build/
+dist/
+*.egg-info/

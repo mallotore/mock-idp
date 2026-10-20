@@ -4,7 +4,7 @@ import jwt
 import pytest
 from urllib.parse import urlparse, parse_qs
 
-from app import create_app
+from mock_idp.app import create_app
 from helpers import (REDIRECT, ISSUER, CLIENT_ID, CLIENT_SECRET, KEY_ID, authorize, code_from, decode,
                      exchange, expire_access_token, expire_code, fill_store, login, peek_next_user, s256, set_clock,
                      stored_codes, stored_pkce)

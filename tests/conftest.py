@@ -3,8 +3,8 @@ import threading
 import pytest
 from werkzeug.serving import make_server
 
-import prepare_mock_idp
-from app import create_app
+from mock_idp import prepare_mock_idp
+from mock_idp.app import create_app
 from helpers import override_config, reset_state
 
 
