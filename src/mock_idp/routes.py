@@ -68,6 +68,7 @@ def well_known() -> Response:
       "userinfo_endpoint": f"{s.issuer}/userinfo",
       "jwks_uri": f"{s.issuer}/jwks",
       "response_types_supported": ["code"],
+      "grant_types_supported": ["authorization_code"],
       "subject_types_supported": ["public"],
       "id_token_signing_alg_values_supported": ["RS256"],
       "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],

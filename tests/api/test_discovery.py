@@ -17,3 +17,9 @@ def test_discovery_advertises_userinfo_and_pkce(client):
   doc = client.get("/.well-known/openid-configuration").get_json()
   assert doc["userinfo_endpoint"] == f"{ISSUER}/userinfo"
   assert "S256" in doc["code_challenge_methods_supported"]
+
+
+def test_discovery_advertises_only_the_authorization_code_grant(client):
+  doc = client.get("/.well-known/openid-configuration").get_json()
+  assert doc["grant_types_supported"] == ["authorization_code"]
+  assert doc["response_types_supported"] == ["code"]
