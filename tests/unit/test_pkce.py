@@ -2,6 +2,7 @@ import pytest
 
 from mock_idp.errors import OAuthError
 from mock_idp.pkce import Pkce, parse_pkce, pkce_matches
+
 from helpers import s256
 
 

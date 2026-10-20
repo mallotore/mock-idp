@@ -1,20 +1,24 @@
-import hmac, secrets
-from collections.abc import Callable
-from collections.abc import Mapping
+import hmac
+import secrets
+from collections.abc import Callable, Mapping
 from typing import Any
+
 import jwt
-from .keys import KEY_ID
-from .settings import Settings
+
 from .errors import INVALID_CLIENT, INVALID_GRANT, OAuthError
+from .keys import KEY_ID
 from .parsing import client_credentials
 from .pkce import pkce_matches
+from .settings import Settings
 from .stores import AccessToken, AuthCode, State
 from .users import User, identity_claims
+
 
 def secret_matches(given: Any, settings: Settings) -> bool:
   if not isinstance(given, str):
     return False
   return hmac.compare_digest(given.encode(), settings.client_secret.encode())
+
 
 def authenticate_client(data: Mapping[str, Any], state: State) -> None:
   """Checks the client without consuming the code, so a failed attempt leaves it redeemable."""
@@ -29,6 +33,7 @@ def authenticate_client(data: Mapping[str, Any], state: State) -> None:
   elif not secret_matches(client_secret, state.settings):
     raise OAuthError(INVALID_CLIENT, status=401)
 
+
 def redeem_code(data: Mapping[str, Any], state: State) -> AuthCode:
   """Codes are single use and short lived. pop() is atomic, so of several concurrent requests only one gets it."""
   entry = state.codes.take(data.get("code"))
@@ -39,6 +44,7 @@ def redeem_code(data: Mapping[str, Any], state: State) -> AuthCode:
   if entry.pkce and not pkce_matches(entry.pkce, data.get("code_verifier")):
     raise OAuthError(INVALID_GRANT, "code_verifier mismatch")
   return entry
+
 
 def build_id_token(user: User, nonce: str | None, settings: Settings, now: Callable[[], float]) -> str:
   issued_at = int(now())
@@ -51,8 +57,8 @@ def build_id_token(user: User, nonce: str | None, settings: Settings, now: Calla
   }
   if nonce:
     payload["nonce"] = nonce
-  return jwt.encode(payload, settings.private_key_path.read_bytes(), algorithm="RS256",
-                    headers={"kid": KEY_ID})
+  return jwt.encode(payload, settings.private_key_path.read_bytes(), algorithm="RS256", headers={"kid": KEY_ID})
+
 
 def issue_tokens(entry: AuthCode, state: State) -> dict[str, Any]:
   settings = state.settings

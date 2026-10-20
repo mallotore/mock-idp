@@ -6,8 +6,9 @@ from helpers import authorize, code_from, decode, exchange
 @pytest.fixture
 def users_file(tmp_path):
   path = tmp_path / "users.json"
-  path.write_text('{"users": [{"email": "admin@example.com", "groups": ["admins"], "name": "Ada"},'
-                  ' {"email": "guest@example.com"}]}')
+  path.write_text(
+    '{"users": [{"email": "admin@example.com", "groups": ["admins"], "name": "Ada"}, {"email": "guest@example.com"}]}'
+  )
   return path
 
 

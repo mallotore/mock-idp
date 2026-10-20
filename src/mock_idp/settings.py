@@ -5,8 +5,10 @@ from pathlib import Path
 
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 
+
 class ConfigError(Exception):
   """A setting is invalid; the message names it."""
+
 
 def _int(environ: Mapping[str, str], name: str, default: int) -> int:
   raw = environ.get(name, str(default))
@@ -14,6 +16,7 @@ def _int(environ: Mapping[str, str], name: str, default: int) -> int:
     return int(raw)
   except ValueError:
     raise ConfigError(f"{name} must be an integer, got {raw!r}") from None
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -39,7 +42,8 @@ class Settings:
   def __post_init__(self) -> None:
     if self.debug and self.host not in LOOPBACK_HOSTS:
       raise ConfigError(
-        f"MOCK_IDP_DEBUG exposes the Werkzeug debugger and needs a loopback MOCK_IDP_HOST, got {self.host!r}")
+        f"MOCK_IDP_DEBUG exposes the Werkzeug debugger and needs a loopback MOCK_IDP_HOST, got {self.host!r}"
+      )
 
   @property
   def private_key_path(self) -> Path:

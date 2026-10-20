@@ -5,6 +5,7 @@ import pytest
 
 from mock_idp import keys
 from mock_idp.settings import Settings
+
 from helpers import KEY_ID
 
 

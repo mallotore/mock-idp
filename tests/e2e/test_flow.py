@@ -1,6 +1,7 @@
 """The full login over real HTTP, the way a browser and a relying party would do it."""
+
 import re
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import jwt
 import requests
@@ -32,8 +33,14 @@ def browser_login(base, email="jane@example.com", groups="devs", claims="", **au
 
 
 def token_request(base, code, **extra):
-  data = {"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT,
-          "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, **extra}
+  data = {
+    "grant_type": "authorization_code",
+    "code": code,
+    "redirect_uri": REDIRECT,
+    "client_id": CLIENT_ID,
+    "client_secret": CLIENT_SECRET,
+    **extra,
+  }
   return requests.post(discovery(base)["token_endpoint"], data=data)
 
 
@@ -94,11 +101,15 @@ def test_pkce_flow_through_the_login_form(live_server):
   query = browser_login(live_server, code_challenge=challenge, code_challenge_method="S256")
   code = query["code"][0]
 
-  wrong = requests.post(f"{live_server}/token", data={"grant_type": "authorization_code", "code": code,
-                        "client_id": CLIENT_ID, "code_verifier": "wrong"})
+  wrong = requests.post(
+    f"{live_server}/token",
+    data={"grant_type": "authorization_code", "code": code, "client_id": CLIENT_ID, "code_verifier": "wrong"},
+  )
   assert wrong.status_code == 400
 
   code = browser_login(live_server, code_challenge=challenge, code_challenge_method="S256")["code"][0]
-  right = requests.post(f"{live_server}/token", data={"grant_type": "authorization_code", "code": code,
-                        "client_id": CLIENT_ID, "code_verifier": verifier})
+  right = requests.post(
+    f"{live_server}/token",
+    data={"grant_type": "authorization_code", "code": code, "client_id": CLIENT_ID, "code_verifier": verifier},
+  )
   assert right.status_code == 200 and "id_token" in right.json()

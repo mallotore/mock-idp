@@ -3,17 +3,19 @@ import json
 import pytest
 
 from mock_idp.settings import Settings
-from mock_idp.users import (UsersFileError, User, auto_login_user, build_user, identity_claims, load_users,
-                            parse_groups)
+from mock_idp.users import User, UsersFileError, auto_login_user, build_user, identity_claims, load_users, parse_groups
 
 
-@pytest.mark.parametrize("raw, expected", [
-  (["a", " b ", ""], ["a", "b"]),
-  ("a, b ,, c", ["a", "b", "c"]),
-  (None, []),
-  (5, ["5"]),
-  ("", []),
-])
+@pytest.mark.parametrize(
+  "raw, expected",
+  [
+    (["a", " b ", ""], ["a", "b"]),
+    ("a, b ,, c", ["a", "b", "c"]),
+    (None, []),
+    (5, ["5"]),
+    ("", []),
+  ],
+)
 def test_parse_groups(raw, expected):
   assert parse_groups(raw) == expected
 
@@ -31,10 +33,12 @@ def test_identity_claims_allow_overriding_sub():
 @pytest.fixture
 def write_users(tmp_path):
   """Writes the users file and returns settings pointing at it."""
+
   def write(content, **overrides):
     path = tmp_path / "users.json"
     path.write_text(content if isinstance(content, str) else json.dumps(content))
     return Settings(users_file=str(path), **overrides)
+
   return write
 
 
@@ -48,14 +52,17 @@ def test_load_users_from_a_list_or_an_object(write_users, wrap):
   assert load_users(settings) == [User("a@b.c", ["g"], {"name": "A"})]
 
 
-@pytest.mark.parametrize("content", [
-  [{"groups": ["g"]}],
-  [{"email": ""}],
-  {"users": "x"},
-  '"just a string"',
-  ["not an object"],
-  "{ broken",
-])
+@pytest.mark.parametrize(
+  "content",
+  [
+    [{"groups": ["g"]}],
+    [{"email": ""}],
+    {"users": "x"},
+    '"just a string"',
+    ["not an object"],
+    "{ broken",
+  ],
+)
 def test_invalid_users_files_are_rejected(write_users, content):
   settings = write_users(content)
   with pytest.raises(UsersFileError):

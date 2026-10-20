@@ -3,9 +3,12 @@
 Everything the tests need from the application's internals (settings, stored codes and tokens, the clock)
 goes through this module, so a refactor of those internals only touches one place.
 """
-import base64, hashlib, time
+
+import base64
+import hashlib
+import time
 from dataclasses import asdict
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import jwt
 
@@ -22,6 +25,7 @@ KEY_ID = keys.KEY_ID
 
 
 # --- clock and state ----------------------------------------------------------------------------
+
 
 class Clock:
   """A clock the tests control; pass clock.now to create_app."""
@@ -77,6 +81,7 @@ def expire_access_tokens(clock):
 
 # --- requests -----------------------------------------------------------------------------------
 
+
 def s256(verifier):
   return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
 
@@ -91,14 +96,21 @@ def authorize(client, **params):
 
 
 def exchange(client, code, **overrides):
-  data = {"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT,
-          "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, **overrides}
+  data = {
+    "grant_type": "authorization_code",
+    "code": code,
+    "redirect_uri": REDIRECT,
+    "client_id": CLIENT_ID,
+    "client_secret": CLIENT_SECRET,
+    **overrides,
+  }
   return client.post("/token", data={k: v for k, v in data.items() if v is not None})
 
 
 def login(client, email="jane@example.com", groups="admins,devs"):
-  response = client.post("/login", data={"email": email, "groups": groups,
-                                         "redirect_uri": REDIRECT, "state": "st", "nonce": "nn"})
+  response = client.post(
+    "/login", data={"email": email, "groups": groups, "redirect_uri": REDIRECT, "state": "st", "nonce": "nn"}
+  )
   assert response.status_code == 302
   return code_from(response)
 
@@ -109,5 +121,6 @@ def signing_key(client):
 
 
 def decode(client, response):
-  return jwt.decode(response.get_json()["id_token"], signing_key(client), algorithms=["RS256"],
-                    audience=CLIENT_ID, issuer=ISSUER)
+  return jwt.decode(
+    response.get_json()["id_token"], signing_key(client), algorithms=["RS256"], audience=CLIENT_ID, issuer=ISSUER
+  )

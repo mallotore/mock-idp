@@ -7,6 +7,7 @@ from werkzeug.serving import make_server
 from mock_idp import keys
 from mock_idp.app import create_app
 from mock_idp.settings import Settings
+
 from helpers import Clock
 
 
@@ -55,8 +56,9 @@ def serve(base_settings):
   def start(**overrides):
     # The issuer contains the port, which is only known once the socket is bound: bind first, build the app after.
     holder = {}
-    server = make_server("127.0.0.1", 0, lambda environ, start_response: holder["app"](environ, start_response),
-                         threaded=True)
+    server = make_server(
+      "127.0.0.1", 0, lambda environ, start_response: holder["app"](environ, start_response), threaded=True
+    )
     base_url = f"http://127.0.0.1:{server.server_port}"
     settings = replace(base_settings, issuer=base_url, public_url=base_url, **overrides)
     holder["app"] = create_app(settings)

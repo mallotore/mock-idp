@@ -3,7 +3,8 @@
 If the mock deviates from the spec in a way a real client cares about, these fail even when our own
 hand-written requests in test_flow.py would still pass.
 """
-from urllib.parse import urlparse, parse_qs
+
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 import requests
@@ -24,13 +25,15 @@ class RelyingParty:
   def __init__(self, base, auth_method="client_secret_basic", secret=CLIENT_SECRET):
     self.base = base
     self.doc = requests.get(f"{base}/.well-known/openid-configuration").json()
-    self.session = OAuth2Session(CLIENT_ID, secret, scope="openid email", redirect_uri=REDIRECT,
-                                 token_endpoint_auth_method=auth_method)
+    self.session = OAuth2Session(
+      CLIENT_ID, secret, scope="openid email", redirect_uri=REDIRECT, token_endpoint_auth_method=auth_method
+    )
     self.nonce = "rp-nonce-1"
 
   def authorization_url(self, **kwargs):
-    url, self.state = self.session.create_authorization_url(self.doc["authorization_endpoint"],
-                                                            nonce=self.nonce, **kwargs)
+    url, self.state = self.session.create_authorization_url(
+      self.doc["authorization_endpoint"], nonce=self.nonce, **kwargs
+    )
     return url
 
   def log_in_as(self, email="jane@example.com", groups=("devs",), **kwargs):
@@ -41,8 +44,9 @@ class RelyingParty:
     return response.headers["Location"]
 
   def fetch_token(self, callback_url, **kwargs):
-    return self.session.fetch_token(self.doc["token_endpoint"], authorization_response=callback_url,
-                                    state=self.state, **kwargs)
+    return self.session.fetch_token(
+      self.doc["token_endpoint"], authorization_response=callback_url, state=self.state, **kwargs
+    )
 
   def validate_id_token(self, id_token, aud=CLIENT_ID):
     """Signature through the advertised JWKS, then iss/aud/nonce/exp the way an OIDC client must."""
@@ -69,8 +73,16 @@ def test_authorization_code_flow(live_server, auth_method):
 
 def test_discovery_is_complete_enough_for_a_client(live_server):
   doc = RelyingParty(live_server).doc
-  for field in ("issuer", "authorization_endpoint", "token_endpoint", "jwks_uri", "userinfo_endpoint",
-                "response_types_supported", "subject_types_supported", "id_token_signing_alg_values_supported"):
+  for field in (
+    "issuer",
+    "authorization_endpoint",
+    "token_endpoint",
+    "jwks_uri",
+    "userinfo_endpoint",
+    "response_types_supported",
+    "subject_types_supported",
+    "id_token_signing_alg_values_supported",
+  ):
     assert field in doc
   assert doc["issuer"] == live_server
 

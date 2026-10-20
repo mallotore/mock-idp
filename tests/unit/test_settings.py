@@ -16,16 +16,34 @@ def test_defaults():
 
 
 def test_every_variable_is_read():
-  settings = Settings.from_env({
-    "MOCK_IDP_PORT": "9000", "MOCK_IDP_HOST": "0.0.0.0", "MOCK_IDP_ISSUER": "http://idp:9000",
-    "MOCK_IDP_PUBLIC_URL": "http://localhost:9000", "MOCK_IDP_CLIENT_ID": "id", "MOCK_IDP_CLIENT_SECRET": "secret",
-    "MOCK_IDP_CODE_TTL": "5", "MOCK_IDP_TOKEN_TTL": "10", "MOCK_IDP_USERS_FILE": "/u.json",
-    "MOCK_IDP_AUTO_LOGIN": "a@b.c", "MOCK_IDP_KEY_DIR": "/keys",
-  })
-  assert settings == Settings(port=9000, host="0.0.0.0", issuer="http://idp:9000",
-                              public_url="http://localhost:9000", client_id="id", client_secret="secret",
-                              code_ttl_seconds=5, token_ttl_seconds=10, users_file="/u.json",
-                              auto_login="a@b.c", key_dir=Path("/keys"))
+  settings = Settings.from_env(
+    {
+      "MOCK_IDP_PORT": "9000",
+      "MOCK_IDP_HOST": "0.0.0.0",
+      "MOCK_IDP_ISSUER": "http://idp:9000",
+      "MOCK_IDP_PUBLIC_URL": "http://localhost:9000",
+      "MOCK_IDP_CLIENT_ID": "id",
+      "MOCK_IDP_CLIENT_SECRET": "secret",
+      "MOCK_IDP_CODE_TTL": "5",
+      "MOCK_IDP_TOKEN_TTL": "10",
+      "MOCK_IDP_USERS_FILE": "/u.json",
+      "MOCK_IDP_AUTO_LOGIN": "a@b.c",
+      "MOCK_IDP_KEY_DIR": "/keys",
+    }
+  )
+  assert settings == Settings(
+    port=9000,
+    host="0.0.0.0",
+    issuer="http://idp:9000",
+    public_url="http://localhost:9000",
+    client_id="id",
+    client_secret="secret",
+    code_ttl_seconds=5,
+    token_ttl_seconds=10,
+    users_file="/u.json",
+    auto_login="a@b.c",
+    key_dir=Path("/keys"),
+  )
 
 
 def test_issuer_default_follows_the_port():

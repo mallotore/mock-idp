@@ -7,6 +7,7 @@ from mock_idp.errors import OAuthError
 from mock_idp.parsing import client_credentials, parse_authorize_request, request_data, require_authorization_code_grant
 from mock_idp.pkce import Pkce
 from mock_idp.settings import Settings
+
 from helpers import CLIENT_ID, REDIRECT
 
 SETTINGS = Settings()
@@ -61,19 +62,31 @@ def test_request_data_ignores_non_object_json(body):
 
 
 def test_parse_authorize_request():
-  req = parse_authorize_request({"redirect_uri": REDIRECT, "state": "s", "nonce": "n", "client_id": CLIENT_ID,
-                                 "code_challenge": "c", "code_challenge_method": "S256"}, SETTINGS)
+  req = parse_authorize_request(
+    {
+      "redirect_uri": REDIRECT,
+      "state": "s",
+      "nonce": "n",
+      "client_id": CLIENT_ID,
+      "code_challenge": "c",
+      "code_challenge_method": "S256",
+    },
+    SETTINGS,
+  )
   assert (req.redirect_uri, req.state, req.nonce) == (REDIRECT, "s", "n")
   assert req.pkce == Pkce("c", "S256")
 
 
-@pytest.mark.parametrize("args, error", [
-  ({"redirect_uri": REDIRECT, "response_type": "token"}, "unsupported_response_type"),
-  ({"redirect_uri": REDIRECT, "scope": "email"}, "invalid_scope"),
-  ({}, "invalid_request"),
-  ({"redirect_uri": REDIRECT, "client_id": "other"}, "unauthorized_client"),
-  ({"redirect_uri": REDIRECT, "code_challenge": "c", "code_challenge_method": ""}, "invalid_request"),
-])
+@pytest.mark.parametrize(
+  "args, error",
+  [
+    ({"redirect_uri": REDIRECT, "response_type": "token"}, "unsupported_response_type"),
+    ({"redirect_uri": REDIRECT, "scope": "email"}, "invalid_scope"),
+    ({}, "invalid_request"),
+    ({"redirect_uri": REDIRECT, "client_id": "other"}, "unauthorized_client"),
+    ({"redirect_uri": REDIRECT, "code_challenge": "c", "code_challenge_method": ""}, "invalid_request"),
+  ],
+)
 def test_invalid_authorize_requests(args, error):
   with pytest.raises(OAuthError) as raised:
     parse_authorize_request(args, SETTINGS)

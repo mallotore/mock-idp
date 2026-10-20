@@ -1,16 +1,21 @@
-import base64, hashlib, hmac
+import base64
+import hashlib
+import hmac
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+
 from .errors import INVALID_REQUEST, OAuthError
 
 S256, PLAIN = "S256", "plain"
 PKCE_METHODS = (S256, PLAIN)
 
+
 @dataclass
 class Pkce:
   challenge: str
   method: str
+
 
 def parse_pkce(params: Mapping[str, Any]) -> Pkce | None:
   """Returns the PKCE parameters from /authorize query args or /login form fields; None without a challenge.
@@ -24,6 +29,7 @@ def parse_pkce(params: Mapping[str, Any]) -> Pkce | None:
   if not challenge:
     return None
   return Pkce(challenge, method or PLAIN)
+
 
 def pkce_matches(pkce: Pkce, verifier: str | None) -> bool:
   if not verifier:

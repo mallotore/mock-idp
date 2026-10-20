@@ -1,7 +1,10 @@
-import json, logging
+import json
+import logging
 from dataclasses import asdict
 from urllib.parse import urlencode
+
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, send_file
+
 from .errors import INVALID_TOKEN, OAuthError
 from .parsing import parse_authorize_request, request_data, require_authorization_code_grant
 from .pkce import PKCE_METHODS, Pkce, parse_pkce
@@ -13,14 +16,18 @@ from .users import User, auto_login_user, build_user, identity_claims, load_user
 oidc_bp = Blueprint("oidc", __name__)
 logger = logging.getLogger(__name__)
 
+
 def app_state() -> State:
   return current_app.extensions["mock_idp"]
+
 
 def settings() -> Settings:
   return app_state().settings
 
-def redirect_with_code(redirect_uri: str, state: str | None, nonce: str | None, user: User,
-                       pkce: Pkce | None) -> Response:
+
+def redirect_with_code(
+  redirect_uri: str, state: str | None, nonce: str | None, user: User, pkce: Pkce | None
+) -> Response:
   code = app_state().issue_code(user, nonce, redirect_uri, pkce)
   params = {"code": code}
   if state:
@@ -28,6 +35,7 @@ def redirect_with_code(redirect_uri: str, state: str | None, nonce: str | None, 
   logger.info("Issued auth code %s for user=%s", code, user.email)
   separator = "&" if "?" in redirect_uri else "?"
   return redirect(f"{redirect_uri}{separator}{urlencode(params)}", code=302)
+
 
 @oidc_bp.after_request
 def no_store_token_responses(response: Response) -> Response:
@@ -37,27 +45,32 @@ def no_store_token_responses(response: Response) -> Response:
     response.headers["Pragma"] = "no-cache"
   return response
 
+
 @oidc_bp.route("/healthz")
 def healthz() -> Response:
   return jsonify({"status": "ok"})
 
+
 @oidc_bp.route("/.well-known/openid-configuration")
 def well_known() -> Response:
   s = settings()
-  return jsonify({
-    "issuer": s.issuer,
-    "authorization_endpoint": f"{s.public_url}/authorize",
-    "token_endpoint": f"{s.issuer}/token",
-    "userinfo_endpoint": f"{s.issuer}/userinfo",
-    "jwks_uri": f"{s.issuer}/jwks",
-    "response_types_supported": ["code"],
-    "subject_types_supported": ["public"],
-    "id_token_signing_alg_values_supported": ["RS256"],
-    "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
-    "code_challenge_methods_supported": list(PKCE_METHODS),
-    "scopes_supported": ["openid", "email", "profile"],
-    "claims_supported": ["sub", "email", "groups"],
-  })
+  return jsonify(
+    {
+      "issuer": s.issuer,
+      "authorization_endpoint": f"{s.public_url}/authorize",
+      "token_endpoint": f"{s.issuer}/token",
+      "userinfo_endpoint": f"{s.issuer}/userinfo",
+      "jwks_uri": f"{s.issuer}/jwks",
+      "response_types_supported": ["code"],
+      "subject_types_supported": ["public"],
+      "id_token_signing_alg_values_supported": ["RS256"],
+      "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
+      "code_challenge_methods_supported": list(PKCE_METHODS),
+      "scopes_supported": ["openid", "email", "profile"],
+      "claims_supported": ["sub", "email", "groups"],
+    }
+  )
+
 
 @oidc_bp.route("/set-user", methods=["POST"])
 def set_user() -> Response:
@@ -81,15 +94,23 @@ def set_user() -> Response:
   app_state().next_user.set(user)
   return jsonify({"status": "ok", "user": asdict(user)})
 
+
 @oidc_bp.route("/authorize")
 def authorize() -> Response | str:
   req = parse_authorize_request(request.args, settings())
   user = app_state().next_user.take() or auto_login_user(settings())
   if user:
     return redirect_with_code(req.redirect_uri, req.state, req.nonce, user, req.pkce)
-  return render_template("login.html", users=load_users(settings()), redirect_uri=req.redirect_uri, state=req.state,
-                         nonce=req.nonce, code_challenge=req.code_challenge,
-                         code_challenge_method=req.code_challenge_method)
+  return render_template(
+    "login.html",
+    users=load_users(settings()),
+    redirect_uri=req.redirect_uri,
+    state=req.state,
+    nonce=req.nonce,
+    code_challenge=req.code_challenge,
+    code_challenge_method=req.code_challenge_method,
+  )
+
 
 @oidc_bp.route("/login", methods=["POST"])
 def login() -> Response:
@@ -114,6 +135,7 @@ def login() -> Response:
   user = build_user(email, form.get("groups"), claims)
   return redirect_with_code(redirect_uri, form.get("state"), form.get("nonce"), user, pkce)
 
+
 @oidc_bp.route("/token", methods=["POST"])
 def token() -> Response:
   data = request_data()
@@ -122,6 +144,7 @@ def token() -> Response:
   entry = redeem_code(data, app_state())
   return jsonify(issue_tokens(entry, app_state()))
 
+
 @oidc_bp.route("/userinfo", methods=["GET", "POST"])
 def userinfo() -> Response:
   auth = request.headers.get("Authorization", "")
@@ -129,6 +152,7 @@ def userinfo() -> Response:
   if not entry:
     raise OAuthError(INVALID_TOKEN, status=401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
   return jsonify(identity_claims(entry.user))
+
 
 @oidc_bp.route("/jwks")
 def jwks() -> Response:

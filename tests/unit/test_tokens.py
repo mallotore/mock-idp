@@ -8,6 +8,7 @@ from mock_idp.errors import OAuthError
 from mock_idp.stores import AuthCode, State
 from mock_idp.tokens import build_id_token, issue_tokens, redeem_code, secret_matches
 from mock_idp.users import User, build_user
+
 from helpers import KEY_ID, REDIRECT
 
 
@@ -18,8 +19,14 @@ def settings(base_settings):
 
 def decode(settings, token):
   public = jwt.PyJWK(json.loads(settings.jwks_path.read_text())["keys"][0]).key
-  return jwt.decode(token, public, algorithms=["RS256"], audience=settings.client_id, issuer=settings.issuer,
-                    options={"verify_exp": False, "verify_iat": False})
+  return jwt.decode(
+    token,
+    public,
+    algorithms=["RS256"],
+    audience=settings.client_id,
+    issuer=settings.issuer,
+    options={"verify_exp": False, "verify_iat": False},
+  )
 
 
 def test_id_token_has_the_registered_claims(settings, clock):

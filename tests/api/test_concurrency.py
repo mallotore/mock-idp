@@ -1,4 +1,5 @@
-import sys, threading
+import sys
+import threading
 
 from helpers import REDIRECT, authorize, exchange, expire_codes, fill_store, login, stored_codes
 

@@ -3,7 +3,7 @@ import base64
 import jwt
 import pytest
 
-from helpers import REDIRECT, CLIENT_ID, CLIENT_SECRET, KEY_ID, code_from, decode, exchange, expire_codes, login
+from helpers import CLIENT_ID, CLIENT_SECRET, KEY_ID, REDIRECT, code_from, decode, exchange, expire_codes, login
 
 
 def test_id_token_contains_identity_groups_and_nonce(client):
@@ -51,8 +51,11 @@ def test_token_rejects_bad_client_credentials(client, overrides):
 
 def test_token_accepts_basic_auth(client):
   basic = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
-  response = client.post("/token", data={"grant_type": "authorization_code", "code": login(client)},
-                         headers={"Authorization": f"Basic {basic}"})
+  response = client.post(
+    "/token",
+    data={"grant_type": "authorization_code", "code": login(client)},
+    headers={"Authorization": f"Basic {basic}"},
+  )
   assert response.status_code == 200
 
 
@@ -81,11 +84,24 @@ def test_basic_auth_credentials_are_form_urldecoded(make_app):
   assert response.status_code == 200
 
 
-@pytest.mark.parametrize("field, value", [("code", [1]), ("code", {"a": 1}), ("code_verifier", 5),
-                                          ("redirect_uri", ["x"]), ("grant_type", ["authorization_code"])])
+@pytest.mark.parametrize(
+  "field, value",
+  [
+    ("code", [1]),
+    ("code", {"a": 1}),
+    ("code_verifier", 5),
+    ("redirect_uri", ["x"]),
+    ("grant_type", ["authorization_code"]),
+  ],
+)
 def test_token_rejects_non_string_json_values(client, field, value):
-  body = {"grant_type": "authorization_code", "code": "code-x", "client_id": CLIENT_ID,
-          "client_secret": CLIENT_SECRET, field: value}
+  body = {
+    "grant_type": "authorization_code",
+    "code": "code-x",
+    "client_id": CLIENT_ID,
+    "client_secret": CLIENT_SECRET,
+    field: value,
+  }
   response = client.post("/token", json=body)
   assert response.status_code == 400
   assert response.get_json()["error"] == "invalid_request"

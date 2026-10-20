@@ -1,12 +1,18 @@
-import json, base64, os
+import base64
+import json
+import os
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+
 from .settings import Settings
 
 KEY_ID = "mock-key-1"
 
+
 def b64url_uint(i: int) -> str:
   return base64.urlsafe_b64encode(i.to_bytes((i.bit_length() + 7) // 8, "big")).decode().rstrip("=")
+
 
 def create_keys(settings: Settings) -> None:
   if not settings.private_key_path.exists():
@@ -26,25 +32,29 @@ def create_keys(settings: Settings) -> None:
   else:
     print("RSA keys already exists")
 
+
 def create_jwks_json(settings: Settings) -> None:
   with open(settings.private_key_path, "rb") as f:
     private_key = serialization.load_pem_private_key(f.read(), password=None)
   public_numbers = private_key.public_key().public_numbers()
 
   jwks = {
-    "keys": [{
-      "kty": "RSA",
-      "use": "sig",
-      "alg": "RS256",
-      "kid": KEY_ID,
-      "n": b64url_uint(public_numbers.n),
-      "e": b64url_uint(public_numbers.e),
-    }]
+    "keys": [
+      {
+        "kty": "RSA",
+        "use": "sig",
+        "alg": "RS256",
+        "kid": KEY_ID,
+        "n": b64url_uint(public_numbers.n),
+        "e": b64url_uint(public_numbers.e),
+      }
+    ]
   }
 
   with open(settings.jwks_path, "w") as f:
     json.dump(jwks, f, indent=2)
   print(f"JWKS created in {settings.jwks_path}")
+
 
 def prepare(settings: Settings) -> None:
   settings.key_dir.mkdir(parents=True, exist_ok=True)

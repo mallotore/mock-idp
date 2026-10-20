@@ -2,10 +2,11 @@
 
 Runs inside docker compose (see run.sh). Only talks to Vault's HTTP API.
 """
+
 import os
 import sys
 import time
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -29,15 +30,29 @@ def vault(method, path, **kwargs):
 
 def configure_vault():
   vault("POST", "sys/auth/oidc", json={"type": "oidc"})
-  vault("POST", "auth/oidc/config", json={
-    "oidc_discovery_url": IDP, "oidc_client_id": CLIENT_ID, "oidc_client_secret": CLIENT_SECRET,
-    "default_role": "identities",
-  })
-  vault("POST", "auth/oidc/role/identities", json={
-    "role_type": "oidc", "user_claim": "email", "groups_claim": "groups", "oidc_scopes": ["openid", "email"],
-    "bound_audiences": [CLIENT_ID], "allowed_redirect_uris": [REDIRECT],
-    "bound_claims": {"groups": list(GROUPS)},
-  })
+  vault(
+    "POST",
+    "auth/oidc/config",
+    json={
+      "oidc_discovery_url": IDP,
+      "oidc_client_id": CLIENT_ID,
+      "oidc_client_secret": CLIENT_SECRET,
+      "default_role": "identities",
+    },
+  )
+  vault(
+    "POST",
+    "auth/oidc/role/identities",
+    json={
+      "role_type": "oidc",
+      "user_claim": "email",
+      "groups_claim": "groups",
+      "oidc_scopes": ["openid", "email"],
+      "bound_audiences": [CLIENT_ID],
+      "allowed_redirect_uris": [REDIRECT],
+      "bound_claims": {"groups": list(GROUPS)},
+    },
+  )
   accessor = vault("GET", "sys/auth")["data"]["oidc/"]["accessor"]
   for policy in {p for policies in GROUPS.values() for p in policies}:
     vault("PUT", f"sys/policies/acl/{policy}", json={"policy": 'path "secret/*" { capabilities = ["read"] }'})
@@ -50,8 +65,9 @@ def configure_vault():
 def login(email, groups):
   """Same flow as `vault login -method=oidc`; /set-user stands in for the person at the browser."""
   nonce = f"nonce-{time.time_ns()}"
-  auth_url = requests.post(f"{VAULT}/v1/auth/oidc/oidc/auth_url",
-                           json={"role": "identities", "redirect_uri": REDIRECT, "client_nonce": nonce})
+  auth_url = requests.post(
+    f"{VAULT}/v1/auth/oidc/oidc/auth_url", json={"role": "identities", "redirect_uri": REDIRECT, "client_nonce": nonce}
+  )
   auth_url.raise_for_status()
 
   requests.post(f"{IDP}/set-user", json={"email": email, "groups": groups}).raise_for_status()
@@ -62,14 +78,18 @@ def login(email, groups):
   assert redirect.status_code == 302, redirect.text
   query = parse_qs(urlparse(redirect.headers["Location"]).query)
 
-  return requests.get(f"{VAULT}/v1/auth/oidc/oidc/callback",
-                      params={"state": query["state"][0], "code": query["code"][0], "client_nonce": nonce})
+  return requests.get(
+    f"{VAULT}/v1/auth/oidc/oidc/callback",
+    params={"state": query["state"][0], "code": query["code"][0], "client_nonce": nonce},
+  )
 
 
 def check(description, condition):
   print(f"{'ok  ' if condition else 'FAIL'} {description}")
   if not condition:
     check.failed = True
+
+
 check.failed = False
 
 
@@ -86,12 +106,16 @@ def main():
   configure_vault()
 
   admin = login("alice@example.com", ["admins@example.com"])
-  check("admin group logs in with both policies",
-        admin.ok and set(admin.json()["auth"]["identity_policies"]) == {"admin-policy", "engineer-policy"})
+  check(
+    "admin group logs in with both policies",
+    admin.ok and set(admin.json()["auth"]["identity_policies"]) == {"admin-policy", "engineer-policy"},
+  )
 
   dev = login("bob@example.com", ["devs@example.com"])
-  check("dev group logs in with engineer-policy only",
-        dev.ok and dev.json()["auth"]["identity_policies"] == ["engineer-policy"])
+  check(
+    "dev group logs in with engineer-policy only",
+    dev.ok and dev.json()["auth"]["identity_policies"] == ["engineer-policy"],
+  )
 
   unmapped = login("carol@example.com", ["unknown@example.com"])
   check("unmapped group is rejected", unmapped.status_code == 400 and "bound claim" in unmapped.text)

@@ -1,7 +1,7 @@
 import re
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
-from helpers import REDIRECT, ISSUER, CLIENT_ID, authorize, code_from, decode, exchange, stored_codes, stored_pkce
+from helpers import CLIENT_ID, ISSUER, REDIRECT, authorize, code_from, decode, exchange, stored_codes, stored_pkce
 
 
 def test_login_redirects_with_code_and_state(client):
@@ -18,16 +18,27 @@ def test_login_requires_email(client):
 
 
 def test_extra_claims_from_login_form_reach_id_token_and_userinfo(client):
-  response = client.post("/login", data={"email": "jane@example.com", "redirect_uri": REDIRECT,
-                                         "claims": '{"name": "Jane Doe", "iss": "evil", "tier": 3}'})
+  response = client.post(
+    "/login",
+    data={
+      "email": "jane@example.com",
+      "redirect_uri": REDIRECT,
+      "claims": '{"name": "Jane Doe", "iss": "evil", "tier": 3}',
+    },
+  )
   tokens = exchange(client, code_from(response))
   claims = decode(client, tokens)
   assert claims["name"] == "Jane Doe" and claims["tier"] == 3
   assert claims["iss"] == ISSUER  # reserved claims cannot be overridden
 
   info = client.get("/userinfo", headers={"Authorization": f"Bearer {tokens.get_json()['access_token']}"})
-  assert info.get_json() == {"sub": "jane@example.com", "email": "jane@example.com", "groups": [],
-                             "name": "Jane Doe", "tier": 3}
+  assert info.get_json() == {
+    "sub": "jane@example.com",
+    "email": "jane@example.com",
+    "groups": [],
+    "name": "Jane Doe",
+    "tier": 3,
+  }
 
 
 def test_login_rejects_claims_that_are_not_a_json_object(client):
@@ -37,8 +48,10 @@ def test_login_rejects_claims_that_are_not_a_json_object(client):
 
 
 def test_login_rejects_unknown_challenge_method(client):
-  response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc",
-                                         "code_challenge_method": "S512"})
+  response = client.post(
+    "/login",
+    data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc", "code_challenge_method": "S512"},
+  )
   assert response.status_code == 400
   assert not stored_codes(client)
 
@@ -56,19 +69,32 @@ def test_login_form_without_challenge_method_completes_with_plain_pkce(client):
   assert "code_challenge_method" not in fields
   response = client.post("/login", data={**fields, "email": "a@b.c"})
   assert response.status_code == 302
-  data = {"grant_type": "authorization_code", "code": code_from(response), "client_id": CLIENT_ID,
-          "code_verifier": "plain-secret"}
+  data = {
+    "grant_type": "authorization_code",
+    "code": code_from(response),
+    "client_id": CLIENT_ID,
+    "code_verifier": "plain-secret",
+  }
   assert client.post("/token", data=data).status_code == 200
 
 
 def test_login_rejects_empty_challenge_method(client):
-  response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc",
-                                         "code_challenge_method": ""})
+  response = client.post(
+    "/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc", "code_challenge_method": ""}
+  )
   assert response.status_code == 400
 
 
 def test_login_does_not_revalidate_the_authorize_parameters(client):
   """Documented in the README: posting to /login directly skips the checks /authorize makes."""
-  response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "client_id": "someone-else",
-                                         "response_type": "token", "scope": "email"})
+  response = client.post(
+    "/login",
+    data={
+      "email": "a@b.c",
+      "redirect_uri": REDIRECT,
+      "client_id": "someone-else",
+      "response_type": "token",
+      "scope": "email",
+    },
+  )
   assert response.status_code == 302

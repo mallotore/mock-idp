@@ -1,15 +1,20 @@
-import threading, uuid
+import threading
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar
+
 from .pkce import Pkce
 from .settings import Settings
 from .users import User
 
+
 class Expiring(Protocol):
   expires_at: float
 
+
 T = TypeVar("T", bound=Expiring)
+
 
 @dataclass
 class AuthCode:
@@ -19,10 +24,12 @@ class AuthCode:
   pkce: Pkce | None
   expires_at: float
 
+
 @dataclass
 class AccessToken:
   user: User
   expires_at: float
+
 
 class ExpiringStore(Generic[T]):
   """Entries that expire, safe to use from several request threads."""
@@ -62,6 +69,7 @@ class ExpiringStore(Generic[T]):
     with self._lock:
       return dict(self._items)
 
+
 class NextUser:
   """Identity used by the next /authorize call, set through POST /set-user (consumed once)."""
 
@@ -81,6 +89,7 @@ class NextUser:
   def peek(self) -> User | None:
     with self._lock:
       return self._user
+
 
 class State:
   """Everything one app instance owns: its settings, clock and stores."""
