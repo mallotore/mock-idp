@@ -96,3 +96,9 @@ def test_login_does_not_revalidate_the_authorize_parameters(client):
     },
   )
   assert response.status_code == 302
+
+
+def test_login_rejects_a_redirect_uri_with_a_fragment(client):
+  response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT + "#fragment"})
+  assert response.status_code == 400
+  assert not stored_codes(client)

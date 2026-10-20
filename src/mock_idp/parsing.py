@@ -42,6 +42,14 @@ def client_credentials(data: Mapping[str, Any]) -> tuple[Any, Any]:
   return client_id, None if secret == "" else secret
 
 
+def parse_redirect_uri(value: str | None) -> str:
+  if not value:
+    raise OAuthError(INVALID_REQUEST, "redirect_uri required")
+  if "#" in value:
+    raise OAuthError(INVALID_REQUEST, "redirect_uri must not contain a fragment")
+  return value
+
+
 @dataclass
 class AuthorizeRequest:
   redirect_uri: str
@@ -55,9 +63,7 @@ def parse_authorize_request(args: Mapping[str, str], settings: Settings) -> Auth
     raise OAuthError(UNSUPPORTED_RESPONSE_TYPE)
   if "openid" not in args.get("scope", "openid").split():
     raise OAuthError(INVALID_SCOPE, "openid scope required")
-  redirect_uri = args.get("redirect_uri")
-  if not redirect_uri:
-    raise OAuthError(INVALID_REQUEST, "redirect_uri required")
+  redirect_uri = parse_redirect_uri(args.get("redirect_uri"))
   if args.get("client_id") not in (None, settings.client_id):
     raise OAuthError(UNAUTHORIZED_CLIENT)
   return AuthorizeRequest(

@@ -7,7 +7,13 @@ from flask import Blueprint, Response, current_app, jsonify, redirect, render_te
 from werkzeug.wrappers import Response as RedirectResponse
 
 from .errors import INVALID_TOKEN, OAuthError
-from .parsing import authorization, parse_authorize_request, request_data, require_authorization_code_grant
+from .parsing import (
+  authorization,
+  parse_authorize_request,
+  parse_redirect_uri,
+  request_data,
+  require_authorization_code_grant,
+)
 from .pkce import PKCE_METHODS, Pkce, parse_pkce
 from .settings import Settings
 from .stores import State
@@ -110,12 +116,10 @@ def authorize() -> Response | RedirectResponse | str:
 def login() -> RedirectResponse:
   form = request.form
   email = form.get("email")
-  redirect_uri = form.get("redirect_uri")
 
   if not email:
     raise OAuthError("Email is required")
-  if not redirect_uri:
-    raise OAuthError("redirect_uri required")
+  redirect_uri = parse_redirect_uri(form.get("redirect_uri"))
   try:
     claims = json.loads(form.get("claims") or "{}")
     if not isinstance(claims, dict):

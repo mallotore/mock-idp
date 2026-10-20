@@ -93,6 +93,7 @@ def test_parse_authorize_request():
     ({"redirect_uri": REDIRECT, "response_type": "token"}, "unsupported_response_type"),
     ({"redirect_uri": REDIRECT, "scope": "email"}, "invalid_scope"),
     ({}, "invalid_request"),
+    ({"redirect_uri": REDIRECT + "#fragment"}, "invalid_request"),
     ({"redirect_uri": REDIRECT, "client_id": "other"}, "unauthorized_client"),
     ({"redirect_uri": REDIRECT, "code_challenge": "c", "code_challenge_method": ""}, "invalid_request"),
   ],
