@@ -63,3 +63,11 @@ def test_set_user_requires_a_json_content_type(client):
   response = client.post("/set-user", data='{"email": "evil@example.com"}', content_type="text/plain")
   assert response.status_code == 400
   assert peek_next_user(client) is None
+
+
+@pytest.mark.parametrize("body", [["x"], {}, {"email": 1}, {"email": "a@b.c", "claims": "x"}])
+def test_set_user_errors_use_the_invalid_request_code(client, body):
+  response = client.post("/set-user", json=body)
+  assert response.status_code == 400
+  assert response.get_json()["error"] == "invalid_request"
+  assert response.get_json()["error_description"]

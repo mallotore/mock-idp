@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, send_file
 from werkzeug.wrappers import Response as RedirectResponse
 
-from .errors import INVALID_TOKEN, OAuthError
+from .errors import INVALID_REQUEST, INVALID_TOKEN, OAuthError
 from .parsing import (
   authorization,
   parse_authorize_request,
@@ -82,15 +82,15 @@ def well_known() -> Response:
 def set_user() -> Response:
   data = request.get_json(silent=True)
   if not isinstance(data, dict):
-    raise OAuthError("body must be a JSON object")
+    raise OAuthError(INVALID_REQUEST, "body must be a JSON object")
   email = data.get("email")
   if not email:
-    raise OAuthError("email required")
+    raise OAuthError(INVALID_REQUEST, "email required")
   if not isinstance(email, str):
-    raise OAuthError("email must be a string")
+    raise OAuthError(INVALID_REQUEST, "email must be a string")
   claims = data.get("claims")
   if claims is not None and not isinstance(claims, dict):
-    raise OAuthError("claims must be an object")
+    raise OAuthError(INVALID_REQUEST, "claims must be an object")
 
   user = build_user(email, data.get("groups"), claims)
   app_state().next_user.set(user)
@@ -119,14 +119,14 @@ def login() -> RedirectResponse:
   email = form.get("email")
 
   if not email:
-    raise OAuthError("Email is required")
+    raise OAuthError(INVALID_REQUEST, "email required")
   redirect_uri = parse_redirect_uri(form.get("redirect_uri"))
   try:
     claims = json.loads(form.get("claims") or "{}")
     if not isinstance(claims, dict):
       raise ValueError("not an object")
   except ValueError:
-    raise OAuthError("claims must be a JSON object")
+    raise OAuthError(INVALID_REQUEST, "claims must be a JSON object")
 
   pkce = parse_pkce(form)
   user = build_user(email, form.get("groups"), claims)

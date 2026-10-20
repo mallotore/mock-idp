@@ -1,6 +1,8 @@
 import re
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+
 from helpers import CLIENT_ID, ISSUER, REDIRECT, authorize, code_from, decode, exchange, stored_codes, stored_pkce
 
 
@@ -102,3 +104,13 @@ def test_login_rejects_a_redirect_uri_with_a_fragment(client):
   response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT + "#fragment"})
   assert response.status_code == 400
   assert not stored_codes(client)
+
+
+@pytest.mark.parametrize(
+  "data",
+  [{"redirect_uri": REDIRECT}, {"email": "a@b.c"}, {"email": "a@b.c", "redirect_uri": REDIRECT, "claims": "[1]"}],
+)
+def test_login_errors_use_the_invalid_request_code(client, data):
+  response = client.post("/login", data=data)
+  assert response.status_code == 400
+  assert response.get_json()["error"] == "invalid_request"
