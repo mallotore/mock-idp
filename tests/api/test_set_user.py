@@ -34,6 +34,13 @@ def test_set_user_claims_and_sub_override(client):
 
 def test_set_user_rejects_non_object_claims(client):
   assert client.post("/set-user", json={"email": "a@b.c", "claims": ["x"]}).status_code == 400
+  assert client.post("/set-user", json={"email": "a@b.c", "claims": ""}).status_code == 400
+
+
+def test_set_user_treats_null_claims_as_none(client):
+  response = client.post("/set-user", json={"email": "a@b.c", "claims": None})
+  assert response.status_code == 200
+  assert response.get_json()["user"]["claims"] == {}
 
 
 @pytest.mark.parametrize("body", ["[]", '"x"', "5", "not json"])

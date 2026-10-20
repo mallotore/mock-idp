@@ -88,10 +88,11 @@ def set_user() -> Response:
     raise OAuthError("email required")
   if not isinstance(email, str):
     raise OAuthError("email must be a string")
-  if not isinstance(data.get("claims", {}), dict):
+  claims = data.get("claims")
+  if claims is not None and not isinstance(claims, dict):
     raise OAuthError("claims must be an object")
 
-  user = build_user(email, data.get("groups"), data.get("claims"))
+  user = build_user(email, data.get("groups"), claims)
   app_state().next_user.set(user)
   return jsonify({"status": "ok", "user": asdict(user)})
 
