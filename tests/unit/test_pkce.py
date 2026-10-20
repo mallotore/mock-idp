@@ -1,9 +1,11 @@
 import pytest
 
 from mock_idp.errors import OAuthError
-from mock_idp.pkce import Pkce, parse_pkce, pkce_matches
+from mock_idp.pkce import Pkce, parse_pkce, pkce_matches, s256
 
-from helpers import s256
+
+def test_s256_matches_the_rfc_7636_example():
+  assert s256("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk") == "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 
 
 def test_s256_verifier_matches():

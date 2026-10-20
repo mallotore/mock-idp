@@ -1,5 +1,3 @@
-import base64
-import hashlib
 import time
 from dataclasses import asdict
 from urllib.parse import parse_qs, urlparse
@@ -61,10 +59,6 @@ def expire_codes(clock):
 
 def expire_access_tokens(clock):
   clock.advance(DEFAULTS.token_ttl_seconds + 1)
-
-
-def s256(verifier):
-  return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
 
 
 def code_from(response):

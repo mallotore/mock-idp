@@ -4,7 +4,9 @@ from urllib.parse import parse_qs, urlparse
 import jwt
 import requests
 
-from helpers import CLIENT_ID, CLIENT_SECRET, REDIRECT, s256
+from mock_idp.pkce import s256
+
+from helpers import CLIENT_ID, CLIENT_SECRET, REDIRECT
 
 
 def discovery(base):

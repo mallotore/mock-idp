@@ -27,10 +27,13 @@ def parse_pkce(params: Mapping[str, Any]) -> Pkce | None:
   return Pkce(challenge, method or PLAIN)
 
 
+def s256(verifier: str) -> str:
+  return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+
+
 def pkce_matches(pkce: Pkce, verifier: str | None) -> bool:
   if not verifier:
     return False
   if pkce.method == S256:
-    digest = hashlib.sha256(verifier.encode()).digest()
-    verifier = base64.urlsafe_b64encode(digest).decode().rstrip("=")
+    verifier = s256(verifier)
   return hmac.compare_digest(verifier.encode(), pkce.challenge.encode())

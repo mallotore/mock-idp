@@ -1,6 +1,8 @@
 import pytest
 
-from helpers import CLIENT_ID, REDIRECT, authorize, code_from, login, s256
+from mock_idp.pkce import s256
+
+from helpers import CLIENT_ID, REDIRECT, authorize, code_from, login
 
 
 def test_pkce_s256_public_client(client):
