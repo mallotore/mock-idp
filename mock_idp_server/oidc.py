@@ -1,4 +1,5 @@
 import base64, hashlib, hmac, json, secrets, time, uuid, jwt
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode, unquote_plus
 from flask import Blueprint, request, jsonify, redirect, render_template, send_file
@@ -107,14 +108,17 @@ def client_credentials():
   return data.get("client_id"), data.get("client_secret")
 
 def parse_pkce(params):
-  """Returns (pkce, error) from /authorize query args or /login form fields; pkce is None without a challenge."""
+  """Returns the PKCE parameters from /authorize query args or /login form fields; None without a challenge.
+
+  An absent code_challenge_method means "plain"; an empty or unknown one is an error.
+  """
+  method = params.get("code_challenge_method")
+  if method == "" or method not in (None, "S256", "plain"):
+    raise OAuthError("invalid_request", "unsupported code_challenge_method")
   challenge = params.get("code_challenge")
   if not challenge:
-    return None, None
-  method = params.get("code_challenge_method") or "plain"
-  if method not in ("S256", "plain"):
-    return None, "unsupported code_challenge_method"
-  return {"challenge": challenge, "method": method}, None
+    return None
+  return {"challenge": challenge, "method": method or "plain"}
 
 def pkce_matches(pkce, verifier):
   if not verifier:
@@ -175,9 +179,16 @@ def set_user():
   next_user = build_user(email, data.get("groups"), data.get("claims"))
   return jsonify({"status": "ok", "user": next_user})
 
-@oidc_bp.route("/authorize")
-def authorize():
-  args = request.args
+@dataclass
+class AuthorizeRequest:
+  redirect_uri: str
+  state: str
+  nonce: str
+  pkce: dict
+  code_challenge: str
+  code_challenge_method: str
+
+def parse_authorize_request(args):
   if args.get("response_type", "code") != "code":
     raise OAuthError("unsupported_response_type")
   if "openid" not in args.get("scope", "openid").split():
@@ -187,22 +198,22 @@ def authorize():
     raise OAuthError("invalid_request", "redirect_uri required")
   if args.get("client_id") not in (None, config.CLIENT_ID):
     raise OAuthError("unauthorized_client")
+  return AuthorizeRequest(redirect_uri, args.get("state"), args.get("nonce"), parse_pkce(args),
+                          args.get("code_challenge"), args.get("code_challenge_method"))
 
-  pkce, pkce_error = parse_pkce(args)
-  if args.get("code_challenge_method") == "":
-    pkce_error = "unsupported code_challenge_method"
-  if pkce_error:
-    raise OAuthError("invalid_request", pkce_error)
+@oidc_bp.route("/authorize")
+def authorize():
+  req = parse_authorize_request(request.args)
 
   global next_user
   user, next_user = next_user, None
   user = user or auto_login_user()
   if user:
-    return issue_code_and_redirect(redirect_uri, args.get("state"), args.get("nonce"), user, pkce)
+    return issue_code_and_redirect(req.redirect_uri, req.state, req.nonce, user, req.pkce)
 
-  return render_template("login.html", users=load_users(), redirect_uri=redirect_uri, state=args.get("state"),
-                         nonce=args.get("nonce"), code_challenge=args.get("code_challenge"),
-                         code_challenge_method=args.get("code_challenge_method"))
+  return render_template("login.html", users=load_users(), redirect_uri=req.redirect_uri, state=req.state,
+                         nonce=req.nonce, code_challenge=req.code_challenge,
+                         code_challenge_method=req.code_challenge_method)
 
 @oidc_bp.route("/login", methods=["POST"])
 def login():
@@ -221,9 +232,7 @@ def login():
   except ValueError:
     raise OAuthError("claims must be a JSON object")
 
-  pkce, pkce_error = parse_pkce(form)
-  if pkce_error:
-    raise OAuthError("invalid_request", pkce_error)
+  pkce = parse_pkce(form)
   user = build_user(email, form.get("groups"), claims)
   return issue_code_and_redirect(redirect_uri, form.get("state"), form.get("nonce"), user, pkce)
 

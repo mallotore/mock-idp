@@ -69,7 +69,7 @@
   <input type="hidden" name="state" value="{{ state or '' }}">
   <input type="hidden" name="nonce" value="{{ nonce or '' }}">
   <input type="hidden" name="code_challenge" value="{{ code_challenge or '' }}">
-  <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method or '' }}">
+  {% if code_challenge_method is not none %}<input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">{% endif %}
 
   <button type="submit">Login</button>
 </form>

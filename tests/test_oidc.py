@@ -1,4 +1,4 @@
-import base64, sys, threading
+import base64, re, sys, threading
 
 import jwt
 import pytest
@@ -438,3 +438,21 @@ def test_token_responses_are_not_cacheable(client):
   for response in (success, failure):
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["Pragma"] == "no-cache"
+
+
+def test_login_form_without_challenge_method_completes_with_plain_pkce(client):
+  """The hidden fields of the login page, posted back as a browser would, carry a challenge without a method."""
+  html = authorize(client, code_challenge="plain-secret").get_data(as_text=True)
+  fields = dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)"', html))
+  assert "code_challenge_method" not in fields
+  response = client.post("/login", data={**fields, "email": "a@b.c"})
+  assert response.status_code == 302
+  data = {"grant_type": "authorization_code", "code": code_from(response), "client_id": CLIENT_ID,
+          "code_verifier": "plain-secret"}
+  assert client.post("/token", data=data).status_code == 200
+
+
+def test_login_rejects_empty_challenge_method(client):
+  response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc",
+                                         "code_challenge_method": ""})
+  assert response.status_code == 400
