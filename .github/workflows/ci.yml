@@ -35,6 +35,17 @@ jobs:
       - run: docker compose run --rm test pytest -m api
       - run: docker compose run --rm test pytest -m e2e
 
+  test-min-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ".[test]"
+      - run: pytest
+
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -44,7 +55,7 @@ jobs:
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test, smoke]
+    needs: [lint, typecheck, test, test-min-python, smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

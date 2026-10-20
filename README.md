@@ -33,7 +33,7 @@ to pin one).
 Open `http://127.0.0.1:8081/authorize?redirect_uri=http://localhost/cb` to see the login page. Pick a saved
 user (from `config/users.json`) or type any email, groups and extra claims.
 
-Without Docker you need Python 3.15: `pip install .` and run `mock-idp` (or `python -m mock_idp`). It listens on
+Without Docker you need Python 3.11 or newer: `pip install .` and run `mock-idp` (or `python -m mock_idp`). It listens on
 `127.0.0.1:8081` and keeps its signing keys in `./mock_idp_files`.
 
 ## Using it from your application
