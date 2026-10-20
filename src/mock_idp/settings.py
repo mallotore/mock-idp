@@ -56,6 +56,7 @@ class Settings:
 
   @classmethod
   def from_env(cls, environ: Mapping[str, str] = os.environ) -> "Settings":
+    environ = {name: value for name, value in environ.items() if value}
     debug = environ.get("MOCK_IDP_DEBUG")
     values: dict[str, Any] = {
       "port": _int(environ, "MOCK_IDP_PORT"),
@@ -67,8 +68,8 @@ class Settings:
       "code_ttl_seconds": _int(environ, "MOCK_IDP_CODE_TTL"),
       "token_ttl_seconds": _int(environ, "MOCK_IDP_TOKEN_TTL"),
       "debug": None if debug is None else debug.lower() == "true",
-      "users_file": environ.get("MOCK_IDP_USERS_FILE") or None,
-      "auto_login": environ.get("MOCK_IDP_AUTO_LOGIN") or None,
+      "users_file": environ.get("MOCK_IDP_USERS_FILE"),
+      "auto_login": environ.get("MOCK_IDP_AUTO_LOGIN"),
       "key_dir": environ.get("MOCK_IDP_KEY_DIR"),
     }
     return cls(**{name: value for name, value in values.items() if value is not None})

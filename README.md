@@ -64,7 +64,7 @@ services:
 
 ## Configuration
 
-Environment variables, set in `docker-compose.yml`:
+Environment variables, set in `docker-compose.yml`. An empty value counts as unset and gets the default:
 
 | Variable | Default | Notes |
 |---|---|---|

@@ -102,6 +102,19 @@ def test_debug_is_allowed_on_loopback(host):
   assert Settings.from_env({"MOCK_IDP_DEBUG": "TRUE", "MOCK_IDP_HOST": host}).debug is True
 
 
-def test_empty_users_file_and_auto_login_mean_unset():
-  settings = Settings.from_env({"MOCK_IDP_USERS_FILE": "", "MOCK_IDP_AUTO_LOGIN": ""})
-  assert settings.users_file is None and settings.auto_login is None
+def test_empty_variables_mean_unset():
+  names = [
+    "MOCK_IDP_PORT",
+    "MOCK_IDP_HOST",
+    "MOCK_IDP_ISSUER",
+    "MOCK_IDP_PUBLIC_URL",
+    "MOCK_IDP_CLIENT_ID",
+    "MOCK_IDP_CLIENT_SECRET",
+    "MOCK_IDP_CODE_TTL",
+    "MOCK_IDP_TOKEN_TTL",
+    "MOCK_IDP_DEBUG",
+    "MOCK_IDP_USERS_FILE",
+    "MOCK_IDP_AUTO_LOGIN",
+    "MOCK_IDP_KEY_DIR",
+  ]
+  assert Settings.from_env(dict.fromkeys(names, "")) == Settings.from_env({})
