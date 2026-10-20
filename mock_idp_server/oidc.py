@@ -8,6 +8,20 @@ import config
 oidc_bp = Blueprint("oidc", __name__)
 logger = logging.getLogger(__name__)
 
+# OAuth error codes (RFC 6749 section 5.2, plus this server's invalid_users_file).
+INVALID_REQUEST = "invalid_request"
+INVALID_GRANT = "invalid_grant"
+INVALID_CLIENT = "invalid_client"
+INVALID_SCOPE = "invalid_scope"
+INVALID_TOKEN = "invalid_token"
+INVALID_USERS_FILE = "invalid_users_file"
+UNSUPPORTED_RESPONSE_TYPE = "unsupported_response_type"
+UNSUPPORTED_GRANT_TYPE = "unsupported_grant_type"
+UNAUTHORIZED_CLIENT = "unauthorized_client"
+
+S256, PLAIN = "S256", "plain"
+PKCE_METHODS = (S256, PLAIN)
+
 class UsersFileError(Exception):
   """The users file is unreadable or malformed."""
 
@@ -72,7 +86,7 @@ def validate_config():
 @oidc_bp.app_errorhandler(UsersFileError)
 def users_file_error(error):
   """A users file broken while the server runs is reported to the caller, not by dropping the request."""
-  return oauth_error(OAuthError("invalid_users_file", str(error), status=500))
+  return oauth_error(OAuthError(INVALID_USERS_FILE, str(error), status=500))
 
 @oidc_bp.app_errorhandler(OAuthError)
 def oauth_error(error):
@@ -114,17 +128,17 @@ def parse_pkce(params):
   An absent code_challenge_method means "plain"; an empty or unknown one is an error.
   """
   method = params.get("code_challenge_method")
-  if method == "" or method not in (None, "S256", "plain"):
-    raise OAuthError("invalid_request", "unsupported code_challenge_method")
+  if method == "" or method not in (None, *PKCE_METHODS):
+    raise OAuthError(INVALID_REQUEST, "unsupported code_challenge_method")
   challenge = params.get("code_challenge")
   if not challenge:
     return None
-  return {"challenge": challenge, "method": method or "plain"}
+  return {"challenge": challenge, "method": method or PLAIN}
 
 def pkce_matches(pkce, verifier):
   if not verifier:
     return False
-  if pkce["method"] == "S256":
+  if pkce["method"] == S256:
     digest = hashlib.sha256(verifier.encode()).digest()
     verifier = base64.urlsafe_b64encode(digest).decode().rstrip("=")
   return hmac.compare_digest(verifier.encode(), pkce["challenge"].encode())
@@ -153,7 +167,7 @@ def well_known():
     "subject_types_supported": ["public"],
     "id_token_signing_alg_values_supported": ["RS256"],
     "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
-    "code_challenge_methods_supported": ["S256", "plain"],
+    "code_challenge_methods_supported": list(PKCE_METHODS),
     "scopes_supported": ["openid", "email", "profile"],
     "claims_supported": ["sub", "email", "groups"],
   })
@@ -191,14 +205,14 @@ class AuthorizeRequest:
 
 def parse_authorize_request(args):
   if args.get("response_type", "code") != "code":
-    raise OAuthError("unsupported_response_type")
+    raise OAuthError(UNSUPPORTED_RESPONSE_TYPE)
   if "openid" not in args.get("scope", "openid").split():
-    raise OAuthError("invalid_scope", "openid scope required")
+    raise OAuthError(INVALID_SCOPE, "openid scope required")
   redirect_uri = args.get("redirect_uri")
   if not redirect_uri:
-    raise OAuthError("invalid_request", "redirect_uri required")
+    raise OAuthError(INVALID_REQUEST, "redirect_uri required")
   if args.get("client_id") not in (None, config.CLIENT_ID):
-    raise OAuthError("unauthorized_client")
+    raise OAuthError(UNAUTHORIZED_CLIENT)
   return AuthorizeRequest(redirect_uri, args.get("state"), args.get("nonce"), parse_pkce(args),
                           args.get("code_challenge"), args.get("code_challenge_method"))
 
@@ -241,9 +255,9 @@ def require_authorization_code_grant(data):
   # JSON clients can send any type; form fields are always strings.
   for name in ("grant_type", "code", "code_verifier", "redirect_uri"):
     if not isinstance(data.get(name, ""), str):
-      raise OAuthError("invalid_request", f"{name} must be a string")
+      raise OAuthError(INVALID_REQUEST, f"{name} must be a string")
   if data.get("grant_type", "authorization_code") != "authorization_code":
-    raise OAuthError("unsupported_grant_type")
+    raise OAuthError(UNSUPPORTED_GRANT_TYPE)
 
 def secret_matches(given):
   if not isinstance(given, str):
@@ -254,24 +268,24 @@ def authenticate_client(data):
   """Checks the client without consuming the code, so a failed attempt leaves it redeemable."""
   client_id, client_secret = client_credentials()
   if client_id != config.CLIENT_ID:
-    raise OAuthError("invalid_client", status=401)
+    raise OAuthError(INVALID_CLIENT, status=401)
   if client_secret is None:
     # Public clients are only accepted when they protect the code with PKCE.
     entry = store.get(data.get("code"))
     if not (entry and entry["pkce"]):
-      raise OAuthError("invalid_client", status=401)
+      raise OAuthError(INVALID_CLIENT, status=401)
   elif not secret_matches(client_secret):
-    raise OAuthError("invalid_client", status=401)
+    raise OAuthError(INVALID_CLIENT, status=401)
 
 def redeem_code(data):
   """Codes are single use and short lived. pop() is atomic, so of several concurrent requests only one gets it."""
   entry = store.pop(data.get("code"), None)
   if not entry or time.time() > entry["expires_at"]:
-    raise OAuthError("invalid_grant", "code not found or expired")
+    raise OAuthError(INVALID_GRANT, "code not found or expired")
   if data.get("redirect_uri") not in (None, entry["redirect_uri"]):
-    raise OAuthError("invalid_grant", "redirect_uri mismatch")
+    raise OAuthError(INVALID_GRANT, "redirect_uri mismatch")
   if entry["pkce"] and not pkce_matches(entry["pkce"], data.get("code_verifier")):
-    raise OAuthError("invalid_grant", "code_verifier mismatch")
+    raise OAuthError(INVALID_GRANT, "code_verifier mismatch")
   return entry
 
 def build_id_token(user, nonce):
@@ -310,7 +324,7 @@ def userinfo():
   auth = request.headers.get("Authorization", "")
   entry = tokens.get(auth[7:]) if auth.startswith("Bearer ") else None
   if not entry or time.time() > entry["expires_at"]:
-    raise OAuthError("invalid_token", status=401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
+    raise OAuthError(INVALID_TOKEN, status=401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
   return jsonify(identity_claims(entry["user"]))
 
 @oidc_bp.route("/jwks")
