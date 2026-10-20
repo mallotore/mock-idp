@@ -456,3 +456,13 @@ def test_login_rejects_empty_challenge_method(client):
   response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc",
                                          "code_challenge_method": ""})
   assert response.status_code == 400
+
+
+@pytest.mark.parametrize("secret", ["é", "wrong-é"])
+def test_non_ascii_client_secret_is_a_mismatch_not_an_error(client, secret):
+  assert exchange(client, login(client), client_secret=secret).status_code == 401
+
+
+def test_malformed_basic_auth_header_is_rejected(client):
+  response = client.post("/token", data={"code": login(client)}, headers={"Authorization": "Basic !!!not-base64"})
+  assert response.status_code == 401

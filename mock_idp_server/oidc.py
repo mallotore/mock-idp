@@ -1,4 +1,4 @@
-import base64, hashlib, hmac, json, secrets, time, uuid, jwt
+import base64, hashlib, hmac, json, logging, secrets, time, uuid, jwt
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlencode, unquote_plus
@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, redirect, render_template, send_f
 import config
 
 oidc_bp = Blueprint("oidc", __name__)
+logger = logging.getLogger(__name__)
 
 class UsersFileError(Exception):
   """The users file is unreadable or malformed."""
@@ -102,7 +103,7 @@ def client_credentials():
     try:
       client_id, _, secret = base64.b64decode(auth[6:]).decode().partition(":")
       return unquote_plus(client_id), unquote_plus(secret)
-    except Exception:
+    except ValueError:  # bad base64 or not UTF-8
       return None, None
   data = request_data()
   return data.get("client_id"), data.get("client_secret")
@@ -244,6 +245,11 @@ def require_authorization_code_grant(data):
   if data.get("grant_type", "authorization_code") != "authorization_code":
     raise OAuthError("unsupported_grant_type")
 
+def secret_matches(given):
+  if not isinstance(given, str):
+    return False
+  return hmac.compare_digest(given.encode(), config.CLIENT_SECRET.encode())
+
 def authenticate_client(data):
   """Checks the client without consuming the code, so a failed attempt leaves it redeemable."""
   client_id, client_secret = client_credentials()
@@ -254,7 +260,7 @@ def authenticate_client(data):
     entry = store.get(data.get("code"))
     if not (entry and entry["pkce"]):
       raise OAuthError("invalid_client", status=401)
-  elif client_secret != config.CLIENT_SECRET:
+  elif not secret_matches(client_secret):
     raise OAuthError("invalid_client", status=401)
 
 def redeem_code(data):
@@ -326,6 +332,6 @@ def issue_code_and_redirect(redirect_uri, state, nonce, user, pkce=None):
   if state:
     params["state"] = state
 
-  print(f"Issued auth code {code} for user={user}")
+  logger.info("Issued auth code %s for user=%s", code, user)
   separator = "&" if "?" in redirect_uri else "?"
   return redirect(f"{redirect_uri}{separator}{urlencode(params)}", code=302)
