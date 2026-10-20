@@ -12,20 +12,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker compose run --rm --build test
-
-  smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - run: ./scripts/smoke.sh
-
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -39,3 +25,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose run --rm --build lint mypy
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose run --rm --build test pytest -m unit
+      - run: docker compose run --rm test pytest -m api
+      - run: docker compose run --rm test pytest -m e2e
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/smoke.sh
