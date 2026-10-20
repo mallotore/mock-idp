@@ -107,6 +107,16 @@ def test_token_rejects_non_string_json_values(client, field, value):
   assert response.get_json()["error"] == "invalid_request"
 
 
+def test_token_accepts_client_credentials_in_a_json_body(client):
+  body = {
+    "grant_type": "authorization_code",
+    "code": login(client),
+    "client_id": CLIENT_ID,
+    "client_secret": CLIENT_SECRET,
+  }
+  assert client.post("/token", json=body).status_code == 200
+
+
 def test_token_responses_are_not_cacheable(client):
   success = exchange(client, login(client))
   failure = exchange(client, "code-nope")

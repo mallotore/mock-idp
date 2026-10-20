@@ -26,7 +26,7 @@ def is_pkce_protected(data: Mapping[str, Any], state: State) -> bool:
 
 
 def authenticate_client(data: Mapping[str, Any], state: State) -> None:
-  client_id, client_secret = client_credentials()
+  client_id, client_secret = client_credentials(data)
   if client_id != state.settings.client_id:
     raise OAuthError(INVALID_CLIENT, status=401)
   if client_secret is None:

@@ -25,7 +25,7 @@ def request_data() -> Mapping[str, Any]:
   return data if isinstance(data, dict) else {}
 
 
-def client_credentials() -> tuple[Any, Any]:
+def client_credentials(data: Mapping[str, Any]) -> tuple[Any, Any]:
   auth = request.headers.get("Authorization", "")
   if auth.startswith("Basic "):
     try:
@@ -33,7 +33,6 @@ def client_credentials() -> tuple[Any, Any]:
       return unquote_plus(client_id), unquote_plus(secret)
     except ValueError:
       return None, None
-  data = request_data()
   return data.get("client_id"), data.get("client_secret")
 
 

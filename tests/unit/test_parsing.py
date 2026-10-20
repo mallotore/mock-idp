@@ -21,28 +21,24 @@ def basic(value):
 
 def test_client_credentials_from_basic_auth():
   with app.test_request_context("/token", method="POST", headers=basic("id:secret")):
-    assert client_credentials() == ("id", "secret")
+    assert client_credentials({"client_id": "other", "client_secret": "other"}) == ("id", "secret")
 
 
 def test_basic_auth_credentials_are_form_urldecoded():
   with app.test_request_context("/token", method="POST", headers=basic("my%40id:s3cr%2Bt%2F%25")):
-    assert client_credentials() == ("my@id", "s3cr+t/%")
+    assert client_credentials({}) == ("my@id", "s3cr+t/%")
 
 
 @pytest.mark.parametrize("header", ["Basic !!!not-base64", "Basic " + base64.b64encode(b"\xff\xfe").decode()])
 def test_bad_basic_header_gives_no_credentials(header):
   with app.test_request_context("/token", method="POST", headers={"Authorization": header}):
-    assert client_credentials() == (None, None)
+    assert client_credentials({"client_id": "id"}) == (None, None)
 
 
-def test_client_credentials_fall_back_to_the_form_body():
-  with app.test_request_context("/token", method="POST", data={"client_id": "id", "client_secret": "s"}):
-    assert client_credentials() == ("id", "s")
-
-
-def test_client_credentials_fall_back_to_the_json_body():
-  with app.test_request_context("/token", method="POST", json={"client_id": "id"}):
-    assert client_credentials() == ("id", None)
+def test_client_credentials_fall_back_to_the_request_data():
+  with app.test_request_context("/token", method="POST"):
+    assert client_credentials({"client_id": "id", "client_secret": "s"}) == ("id", "s")
+    assert client_credentials({"client_id": "id"}) == ("id", None)
 
 
 def test_request_data_prefers_the_form():
