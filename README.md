@@ -136,7 +136,8 @@ On the application side, point it at those claims. For example:
 
 - Vault (OIDC auth role): `user_claim=email groups_claim=groups`, as in the [Vault example](examples/vault/README.md).
 - Grafana (`[auth.generic_oauth]`): `groups_attribute_path = groups` and
-  `role_attribute_path = contains(groups[*], 'admins@example.com') && 'Admin' || 'Viewer'`.
+  `role_attribute_path = contains(groups[*], 'admins@example.com') && 'Admin' || 'Viewer'`, as in the
+  [Grafana example](examples/grafana/README.md).
 
 ## Endpoints
 
@@ -178,6 +179,8 @@ Codes expire after 60 s and are single use. Token responses are sent with `Cache
 
 - [Vault](examples/vault/README.md): OIDC auth method with group-to-policy mapping, checked against a real Vault
   by `./examples/vault/run.sh`.
+- [Grafana](examples/grafana/README.md): generic OAuth login with group-to-role mapping, checked against a real Grafana
+  by `./examples/grafana/run.sh`.
 
 ## Development
 
@@ -195,6 +198,7 @@ Everything runs from the repo root and needs only Docker.
 | Type-check (mypy) | `docker compose run --rm --build lint mypy` |
 | Check the real image works | `./scripts/smoke.sh` (builds it, starts it, curls the endpoints) |
 | Check against a real Vault | `./examples/vault/run.sh` (CI runs it every Monday, or by hand) |
+| Check against a real Grafana | `./examples/grafana/run.sh` (same schedule) |
 | Add or change users | edit `config/users.json` (re-read on every login, no restart) |
 
 Layout:
@@ -205,6 +209,7 @@ tests/unit/       pure functions and small classes, no HTTP
 tests/api/        endpoint behaviour through the Flask test client, one file per topic
 tests/e2e/        the full login over real HTTP, Authlib as an independent client, real start-up
 examples/vault/   a real-Vault check (run.sh, check.py, compose overlay)
+examples/grafana/ a real-Grafana check (same layout)
 config/users.json sample users mounted by the compose file
 ```
 
