@@ -29,6 +29,13 @@ def test_basic_auth_credentials_are_form_urldecoded():
     assert client_credentials({}) == ("my@id", "s3cr+t/%")
 
 
+@pytest.mark.parametrize("scheme", ["basic", "BASIC"])
+def test_the_basic_scheme_is_case_insensitive(scheme):
+  header = {"Authorization": f"{scheme} " + base64.b64encode(b"id:secret").decode()}
+  with app.test_request_context("/token", method="POST", headers=header):
+    assert client_credentials({}) == ("id", "secret")
+
+
 def test_an_empty_secret_counts_as_no_secret():
   with app.test_request_context("/token", method="POST", headers=basic("id:")):
     assert client_credentials({}) == ("id", None)

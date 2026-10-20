@@ -21,3 +21,8 @@ def test_userinfo_rejects_expired_token(client, clock):
   access_token = exchange(client, login(client)).get_json()["access_token"]
   expire_access_tokens(clock)
   assert client.get("/userinfo", headers={"Authorization": f"Bearer {access_token}"}).status_code == 401
+
+
+def test_the_bearer_scheme_is_case_insensitive(client):
+  access_token = exchange(client, login(client)).get_json()["access_token"]
+  assert client.get("/userinfo", headers={"Authorization": f"bearer {access_token}"}).status_code == 200

@@ -7,7 +7,7 @@ from flask import Blueprint, Response, current_app, jsonify, redirect, render_te
 from werkzeug.wrappers import Response as RedirectResponse
 
 from .errors import INVALID_TOKEN, OAuthError
-from .parsing import parse_authorize_request, request_data, require_authorization_code_grant
+from .parsing import authorization, parse_authorize_request, request_data, require_authorization_code_grant
 from .pkce import PKCE_METHODS, Pkce, parse_pkce
 from .settings import Settings
 from .stores import State
@@ -141,8 +141,7 @@ def token() -> Response:
 
 @oidc_bp.route("/userinfo", methods=["GET", "POST"])
 def userinfo() -> Response:
-  auth = request.headers.get("Authorization", "")
-  entry = app_state().tokens.get(auth[7:]) if auth.startswith("Bearer ") else None
+  entry = app_state().tokens.get(authorization("Bearer"))
   if not entry:
     raise OAuthError(INVALID_TOKEN, status=401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
   return jsonify(identity_claims(entry.user))

@@ -25,12 +25,17 @@ def request_data() -> Mapping[str, Any]:
   return data if isinstance(data, dict) else {}
 
 
+def authorization(scheme: str) -> str | None:
+  name, _, value = request.headers.get("Authorization", "").partition(" ")
+  return value.strip() if name.lower() == scheme.lower() else None
+
+
 def client_credentials(data: Mapping[str, Any]) -> tuple[Any, Any]:
   client_id, secret = data.get("client_id"), data.get("client_secret")
-  auth = request.headers.get("Authorization", "")
-  if auth.startswith("Basic "):
+  basic = authorization("Basic")
+  if basic is not None:
     try:
-      basic_id, _, basic_secret = base64.b64decode(auth[6:]).decode().partition(":")
+      basic_id, _, basic_secret = base64.b64decode(basic).decode().partition(":")
     except ValueError:
       return None, None
     client_id, secret = unquote_plus(basic_id), unquote_plus(basic_secret)
