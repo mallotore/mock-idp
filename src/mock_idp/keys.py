@@ -22,9 +22,14 @@ def b64url_uint(i: int) -> str:
 def write_private_key_atomically(path: Path, pem: bytes) -> None:
   tmp = path.with_suffix(".tmp")
   fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-  with os.fdopen(fd, "wb") as f:
-    f.write(pem)
-  os.replace(tmp, path)
+  try:
+    with os.fdopen(fd, "wb") as f:
+      os.fchmod(f.fileno(), 0o600)
+      f.write(pem)
+    os.replace(tmp, path)
+  except BaseException:
+    tmp.unlink(missing_ok=True)
+    raise
 
 
 def create_keys(settings: Settings) -> None:

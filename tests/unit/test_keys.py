@@ -48,6 +48,24 @@ def test_private_key_is_owner_only_and_leaves_no_temp_file(settings, key_dir):
   assert not list(key_dir.glob("*.tmp"))
 
 
+def test_a_stale_world_readable_temp_file_does_not_leak_its_mode(settings, key_dir):
+  key_dir.mkdir(parents=True)
+  (key_dir / "private.tmp").write_text("stale")
+  (key_dir / "private.tmp").chmod(0o644)
+  keys.prepare(settings)
+  assert (key_dir / "private.pem").stat().st_mode & 0o777 == 0o600
+
+
+def test_a_failed_write_leaves_no_temp_file(settings, key_dir, monkeypatch):
+  def fail(*args):
+    raise OSError("disk full")
+
+  monkeypatch.setattr(keys.os, "replace", fail)
+  with pytest.raises(keys.KeysError, match="disk full"):
+    keys.prepare(settings)
+  assert not list(key_dir.glob("*"))
+
+
 def test_jwks_document_has_one_rsa_signing_key(settings):
   keys.prepare(settings)
   [key] = json.loads(settings.jwks_path.read_text())["keys"]
