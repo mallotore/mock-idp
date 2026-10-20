@@ -9,6 +9,12 @@ oidc_bp = Blueprint("oidc", __name__)
 class UsersFileError(Exception):
   """The users file is unreadable or malformed."""
 
+class OAuthError(Exception):
+  """An error answered as JSON: {"error": ..., "error_description": ...} (description omitted when empty)."""
+  def __init__(self, error, description="", status=400, headers=None):
+    super().__init__(error)
+    self.error, self.description, self.status, self.headers = error, description, status, headers or {}
+
 # Claims a user can never override through `claims` or the users file.
 RESERVED_CLAIMS = {"iss", "aud", "exp", "iat", "nonce"}
 
@@ -64,7 +70,14 @@ def validate_config():
 @oidc_bp.app_errorhandler(UsersFileError)
 def users_file_error(error):
   """A users file broken while the server runs is reported to the caller, not by dropping the request."""
-  return jsonify({"error": "invalid_users_file", "error_description": str(error)}), 500
+  return oauth_error(OAuthError("invalid_users_file", str(error), status=500))
+
+@oidc_bp.app_errorhandler(OAuthError)
+def oauth_error(error):
+  body = {"error": error.error}
+  if error.description:
+    body["error_description"] = error.description
+  return jsonify(body), error.status, error.headers
 
 def purge_expired():
   now = time.time()
@@ -150,14 +163,14 @@ def set_user():
   # No force=True: requiring a JSON Content-Type makes browsers preflight cross-site requests.
   data = request.get_json(silent=True)
   if not isinstance(data, dict):
-    return jsonify({"error": "body must be a JSON object"}), 400
+    raise OAuthError("body must be a JSON object")
   email = data.get("email")
   if not email:
-    return jsonify({"error": "email required"}), 400
+    raise OAuthError("email required")
   if not isinstance(email, str):
-    return jsonify({"error": "email must be a string"}), 400
+    raise OAuthError("email must be a string")
   if not isinstance(data.get("claims", {}), dict):
-    return jsonify({"error": "claims must be an object"}), 400
+    raise OAuthError("claims must be an object")
 
   next_user = build_user(email, data.get("groups"), data.get("claims"))
   return jsonify({"status": "ok", "user": next_user})
@@ -166,20 +179,20 @@ def set_user():
 def authorize():
   args = request.args
   if args.get("response_type", "code") != "code":
-    return jsonify({"error": "unsupported_response_type"}), 400
+    raise OAuthError("unsupported_response_type")
   if "openid" not in args.get("scope", "openid").split():
-    return jsonify({"error": "invalid_scope", "error_description": "openid scope required"}), 400
+    raise OAuthError("invalid_scope", "openid scope required")
   redirect_uri = args.get("redirect_uri")
   if not redirect_uri:
-    return jsonify({"error": "invalid_request", "error_description": "redirect_uri required"}), 400
+    raise OAuthError("invalid_request", "redirect_uri required")
   if args.get("client_id") not in (None, config.CLIENT_ID):
-    return jsonify({"error": "unauthorized_client"}), 400
+    raise OAuthError("unauthorized_client")
 
   pkce, pkce_error = parse_pkce(args)
   if args.get("code_challenge_method") == "":
     pkce_error = "unsupported code_challenge_method"
   if pkce_error:
-    return jsonify({"error": "invalid_request", "error_description": pkce_error}), 400
+    raise OAuthError("invalid_request", pkce_error)
 
   global next_user
   user, next_user = next_user, None
@@ -198,19 +211,19 @@ def login():
   redirect_uri = form.get("redirect_uri")
 
   if not email:
-    return jsonify({"error": "Email is required"}), 400
+    raise OAuthError("Email is required")
   if not redirect_uri:
-    return jsonify({"error": "redirect_uri required"}), 400
+    raise OAuthError("redirect_uri required")
   try:
     claims = json.loads(form.get("claims") or "{}")
     if not isinstance(claims, dict):
       raise ValueError("not an object")
   except ValueError:
-    return jsonify({"error": "claims must be a JSON object"}), 400
+    raise OAuthError("claims must be a JSON object")
 
   pkce, pkce_error = parse_pkce(form)
   if pkce_error:
-    return jsonify({"error": "invalid_request", "error_description": pkce_error}), 400
+    raise OAuthError("invalid_request", pkce_error)
   user = build_user(email, form.get("groups"), claims)
   return issue_code_and_redirect(redirect_uri, form.get("state"), form.get("nonce"), user, pkce)
 
@@ -221,31 +234,31 @@ def token():
   # JSON clients can send any type; form fields are always strings.
   for name in ("grant_type", "code", "code_verifier", "redirect_uri"):
     if not isinstance(data.get(name, ""), str):
-      return jsonify({"error": "invalid_request", "error_description": f"{name} must be a string"}), 400
+      raise OAuthError("invalid_request", f"{name} must be a string")
 
   if data.get("grant_type", "authorization_code") != "authorization_code":
-    return jsonify({"error": "unsupported_grant_type"}), 400
+    raise OAuthError("unsupported_grant_type")
 
   entry = store.get(data.get("code"))
   client_id, client_secret = client_credentials()
   if client_id != config.CLIENT_ID:
-    return jsonify({"error": "invalid_client"}), 401
+    raise OAuthError("invalid_client", status=401)
   if client_secret is None:
     # Public clients are only accepted when they protect the code with PKCE.
     if not (entry and entry["pkce"]):
-      return jsonify({"error": "invalid_client"}), 401
+      raise OAuthError("invalid_client", status=401)
   elif client_secret != config.CLIENT_SECRET:
-    return jsonify({"error": "invalid_client"}), 401
+    raise OAuthError("invalid_client", status=401)
 
   # Codes are single use and short lived. pop() is atomic, so of several concurrent requests
   # only one gets the entry; a failed client authentication above leaves the code intact.
   entry = store.pop(data.get("code"), None)
   if not entry or time.time() > entry["expires_at"]:
-    return jsonify({"error": "invalid_grant", "error_description": "code not found or expired"}), 400
+    raise OAuthError("invalid_grant", "code not found or expired")
   if data.get("redirect_uri") not in (None, entry["redirect_uri"]):
-    return jsonify({"error": "invalid_grant", "error_description": "redirect_uri mismatch"}), 400
+    raise OAuthError("invalid_grant", "redirect_uri mismatch")
   if entry["pkce"] and not pkce_matches(entry["pkce"], data.get("code_verifier")):
-    return jsonify({"error": "invalid_grant", "error_description": "code_verifier mismatch"}), 400
+    raise OAuthError("invalid_grant", "code_verifier mismatch")
 
   user = entry["user"]
   now = int(time.time())
@@ -276,7 +289,7 @@ def userinfo():
   auth = request.headers.get("Authorization", "")
   entry = tokens.get(auth[7:]) if auth.startswith("Bearer ") else None
   if not entry or time.time() > entry["expires_at"]:
-    return jsonify({"error": "invalid_token"}), 401, {"WWW-Authenticate": 'Bearer error="invalid_token"'}
+    raise OAuthError("invalid_token", status=401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
   return jsonify(identity_claims(entry["user"]))
 
 @oidc_bp.route("/jwks")
