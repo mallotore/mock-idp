@@ -39,6 +39,14 @@ def stored_codes():
   return dict(oidc.store)
 
 
+def fill_store(count):
+  """Adds `count` unexpired authorization codes."""
+  expires_at = time.time() + 3600
+  for i in range(count):
+    oidc.store[f"filler-{i}"] = {"nonce": None, "user": None, "redirect_uri": REDIRECT, "pkce": None,
+                                 "expires_at": expires_at}
+
+
 def stored_pkce():
   """The PKCE parameters saved with the only stored code."""
   [entry] = oidc.store.values()

@@ -1,4 +1,4 @@
-import base64, threading
+import base64, sys, threading
 
 import jwt
 import pytest
@@ -6,7 +6,7 @@ from urllib.parse import urlparse, parse_qs
 
 from app import create_app
 from helpers import (REDIRECT, ISSUER, CLIENT_ID, CLIENT_SECRET, KEY_ID, authorize, code_from, decode,
-                     exchange, expire_access_token, expire_code, login, peek_next_user, s256, set_clock,
+                     exchange, expire_access_token, expire_code, fill_store, login, peek_next_user, s256, set_clock,
                      stored_codes, stored_pkce)
 
 
@@ -399,3 +399,42 @@ def test_authorize_requires_openid_scope(client):
 
 def test_authorize_accepts_code_response_type_and_openid_scope(client):
   assert authorize(client, response_type="code", scope="openid email").status_code == 200
+
+
+@pytest.mark.parametrize("field, value", [("code", [1]), ("code", {"a": 1}), ("code_verifier", 5),
+                                          ("redirect_uri", ["x"]), ("grant_type", ["authorization_code"])])
+def test_token_rejects_non_string_json_values(client, field, value):
+  body = {"grant_type": "authorization_code", "code": "code-x", "client_id": CLIENT_ID,
+          "client_secret": CLIENT_SECRET, field: value}
+  response = client.post("/token", json=body)
+  assert response.status_code == 400
+  assert response.get_json()["error"] == "invalid_request"
+
+
+def test_concurrent_logins_do_not_fail_while_purging(client):
+  fill_store(10000)
+  previous = sys.getswitchinterval()
+  sys.setswitchinterval(1e-6)
+  statuses = []
+
+  def post_logins():
+    local = create_app().test_client()
+    for _ in range(40):
+      statuses.append(local.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT}).status_code)
+
+  try:
+    threads = [threading.Thread(target=post_logins) for _ in range(6)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+  finally:
+    sys.setswitchinterval(previous)
+  assert statuses.count(302) == len(statuses) == 240
+
+
+def test_token_responses_are_not_cacheable(client):
+  success = exchange(client, login(client))
+  failure = exchange(client, "code-nope")
+  assert success.status_code == 200 and failure.status_code == 400
+  for response in (success, failure):
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Pragma"] == "no-cache"

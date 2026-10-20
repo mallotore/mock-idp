@@ -69,8 +69,10 @@ def users_file_error(error):
 def purge_expired():
   now = time.time()
   for registry in (store, tokens):
-    for key in [k for k, v in registry.items() if v["expires_at"] < now]:
-      del registry[key]
+    # Snapshot first: other request threads may insert while this one iterates.
+    for key, value in list(registry.items()):
+      if value["expires_at"] < now:
+        registry.pop(key, None)
 
 def request_data():
   """Form fields, or a JSON object for clients that post JSON."""
@@ -108,6 +110,14 @@ def pkce_matches(pkce, verifier):
     digest = hashlib.sha256(verifier.encode()).digest()
     verifier = base64.urlsafe_b64encode(digest).decode().rstrip("=")
   return hmac.compare_digest(verifier.encode(), pkce["challenge"].encode())
+
+@oidc_bp.after_request
+def no_store_token_responses(response):
+  """RFC 6749 section 5.1: token responses must not be cached."""
+  if request.path == "/token":
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+  return response
 
 @oidc_bp.route("/healthz")
 def healthz():
@@ -207,6 +217,11 @@ def login():
 @oidc_bp.route("/token", methods=["POST"])
 def token():
   data = request_data()
+
+  # JSON clients can send any type; form fields are always strings.
+  for name in ("grant_type", "code", "code_verifier", "redirect_uri"):
+    if not isinstance(data.get(name, ""), str):
+      return jsonify({"error": "invalid_request", "error_description": f"{name} must be a string"}), 400
 
   if data.get("grant_type", "authorization_code") != "authorization_code":
     return jsonify({"error": "unsupported_grant_type"}), 400
