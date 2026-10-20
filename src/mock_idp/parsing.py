@@ -26,14 +26,15 @@ def request_data() -> Mapping[str, Any]:
 
 
 def client_credentials(data: Mapping[str, Any]) -> tuple[Any, Any]:
+  client_id, secret = data.get("client_id"), data.get("client_secret")
   auth = request.headers.get("Authorization", "")
   if auth.startswith("Basic "):
     try:
-      client_id, _, secret = base64.b64decode(auth[6:]).decode().partition(":")
-      return unquote_plus(client_id), unquote_plus(secret)
+      basic_id, _, basic_secret = base64.b64decode(auth[6:]).decode().partition(":")
     except ValueError:
       return None, None
-  return data.get("client_id"), data.get("client_secret")
+    client_id, secret = unquote_plus(basic_id), unquote_plus(basic_secret)
+  return client_id, None if secret == "" else secret
 
 
 @dataclass

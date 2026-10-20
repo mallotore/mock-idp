@@ -1,3 +1,5 @@
+import base64
+
 import pytest
 
 from mock_idp.pkce import s256
@@ -22,6 +24,24 @@ def test_pkce_s256_public_client(client):
   code = code_from(login_response)
   public = {"grant_type": "authorization_code", "code": code, "client_id": CLIENT_ID, "code_verifier": verifier}
   assert client.post("/token", data=public).status_code == 200
+
+
+def test_pkce_public_client_with_an_empty_basic_secret(client):
+  verifier = "v" * 50
+  code = code_from(
+    client.post(
+      "/login",
+      data={
+        "email": "a@b.c",
+        "redirect_uri": REDIRECT,
+        "code_challenge": s256(verifier),
+        "code_challenge_method": "S256",
+      },
+    )
+  )
+  basic = {"Authorization": "Basic " + base64.b64encode(f"{CLIENT_ID}:".encode()).decode()}
+  data = {"grant_type": "authorization_code", "code": code, "code_verifier": verifier}
+  assert client.post("/token", data=data, headers=basic).status_code == 200
 
 
 @pytest.mark.parametrize("verifier", ["wrong-verifier", None])
