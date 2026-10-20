@@ -65,7 +65,7 @@ def test_login_defaults_challenge_method_to_plain(client):
 def test_login_form_without_challenge_method_completes_with_plain_pkce(client):
   html = authorize(client, code_challenge="plain-secret").get_data(as_text=True)
   fields = dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)"', html))
-  assert "code_challenge_method" not in fields
+  assert fields["code_challenge_method"] == "plain"
   response = client.post("/login", data={**fields, "email": "a@b.c"})
   assert response.status_code == 302
   data = {

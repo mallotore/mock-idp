@@ -102,8 +102,7 @@ def authorize() -> Response | RedirectResponse | str:
     redirect_uri=req.redirect_uri,
     state=req.state,
     nonce=req.nonce,
-    code_challenge=req.code_challenge,
-    code_challenge_method=req.code_challenge_method,
+    pkce=req.pkce,
   )
 
 

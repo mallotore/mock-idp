@@ -68,8 +68,10 @@
   <input type="hidden" name="redirect_uri" value="{{ redirect_uri or '' }}">
   <input type="hidden" name="state" value="{{ state or '' }}">
   <input type="hidden" name="nonce" value="{{ nonce or '' }}">
-  <input type="hidden" name="code_challenge" value="{{ code_challenge or '' }}">
-  {% if code_challenge_method is not none %}<input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">{% endif %}
+  {% if pkce %}
+  <input type="hidden" name="code_challenge" value="{{ pkce.challenge }}">
+  <input type="hidden" name="code_challenge_method" value="{{ pkce.method }}">
+  {% endif %}
 
   <button type="submit">Login</button>
 </form>

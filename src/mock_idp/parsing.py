@@ -43,8 +43,6 @@ class AuthorizeRequest:
   state: str | None
   nonce: str | None
   pkce: Pkce | None
-  code_challenge: str | None
-  code_challenge_method: str | None
 
 
 def parse_authorize_request(args: Mapping[str, str], settings: Settings) -> AuthorizeRequest:
@@ -62,8 +60,6 @@ def parse_authorize_request(args: Mapping[str, str], settings: Settings) -> Auth
     args.get("state"),
     args.get("nonce"),
     parse_pkce(args),
-    args.get("code_challenge"),
-    args.get("code_challenge_method"),
   )
 
 

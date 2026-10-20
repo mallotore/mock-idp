@@ -49,3 +49,8 @@ def test_authorize_accepts_code_response_type_and_openid_scope(client):
 
 def test_authorize_ignores_challenge_method_without_a_challenge(client):
   assert authorize(client, code_challenge_method="foo").status_code == 200
+
+
+def test_login_form_has_no_pkce_fields_without_a_challenge(client):
+  html = authorize(client, code_challenge_method="S256").get_data(as_text=True)
+  assert "code_challenge" not in html
