@@ -26,15 +26,19 @@ def is_pkce_protected(data: Mapping[str, Any], state: State) -> bool:
   return bool(entry and entry.pkce)
 
 
+def invalid_client() -> OAuthError:
+  return OAuthError(INVALID_CLIENT, status=401, headers={"WWW-Authenticate": 'Basic realm="mock-idp"'})
+
+
 def authenticate_client(data: Mapping[str, Any], state: State) -> None:
   client_id, client_secret = client_credentials(data)
   if client_id != state.settings.client_id:
-    raise OAuthError(INVALID_CLIENT, status=401)
+    raise invalid_client()
   if client_secret is None:
     if not is_pkce_protected(data, state):
-      raise OAuthError(INVALID_CLIENT, status=401)
+      raise invalid_client()
   elif not secret_matches(client_secret, state.settings):
-    raise OAuthError(INVALID_CLIENT, status=401)
+    raise invalid_client()
 
 
 def redeem_code(data: Mapping[str, Any], state: State) -> AuthCode:

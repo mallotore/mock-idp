@@ -58,7 +58,9 @@ def test_redirect_uri_must_match_authorization_request(client):
 
 @pytest.mark.parametrize("overrides", [{"client_secret": "wrong"}, {"client_id": "wrong"}, {"client_secret": None}])
 def test_token_rejects_bad_client_credentials(client, overrides):
-  assert exchange(client, login(client), **overrides).status_code == 401
+  response = exchange(client, login(client), **overrides)
+  assert response.status_code == 401
+  assert response.headers["WWW-Authenticate"] == 'Basic realm="mock-idp"'
 
 
 def test_token_accepts_basic_auth(client):
@@ -146,6 +148,7 @@ def test_non_ascii_client_secret_is_a_mismatch_not_an_error(client, secret):
 def test_malformed_basic_auth_header_is_rejected(client):
   response = client.post("/token", data={"code": login(client)}, headers={"Authorization": "Basic !!!not-base64"})
   assert response.status_code == 401
+  assert response.headers["WWW-Authenticate"] == 'Basic realm="mock-idp"'
 
 
 def test_an_unreadable_signing_key_fails_before_the_code_is_used(make_app, base_settings, tmp_path):
