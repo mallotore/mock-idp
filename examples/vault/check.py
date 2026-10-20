@@ -12,7 +12,8 @@ import requests
 VAULT = os.environ["VAULT_ADDR"]
 IDP = os.environ["IDP_URL"]
 HEADERS = {"X-Vault-Token": os.environ["VAULT_TOKEN"]}
-CLIENT_ID, CLIENT_SECRET = "vault-oidc-client-id", "vault-oidc-client-secret"
+CLIENT_ID = os.getenv("MOCK_IDP_CLIENT_ID", "mock-idp-client")
+CLIENT_SECRET = os.getenv("MOCK_IDP_CLIENT_SECRET", "mock-idp-secret")
 REDIRECT = "http://localhost:8250/oidc/callback"
 GROUPS = {
   "admins@example.com": ["admin-policy", "engineer-policy"],
@@ -41,7 +42,8 @@ def configure_vault():
   for policy in {p for policies in GROUPS.values() for p in policies}:
     vault("PUT", f"sys/policies/acl/{policy}", json={"policy": 'path "secret/*" { capabilities = ["read"] }'})
   for name, policies in GROUPS.items():
-    group_id = vault("POST", "identity/group", json={"name": name, "type": "external", "policies": policies})["data"]["id"]
+    group = {"name": name, "type": "external", "policies": policies}
+    group_id = vault("POST", "identity/group", json=group)["data"]["id"]
     vault("POST", "identity/group-alias", json={"name": name, "mount_accessor": accessor, "canonical_id": group_id})
 
 

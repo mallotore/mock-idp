@@ -2,8 +2,8 @@
 
 [![ci](https://github.com/mallotore/mock-idp/actions/workflows/ci.yml/badge.svg)](https://github.com/mallotore/mock-idp/actions/workflows/ci.yml)
 
-A tiny OpenID Connect identity provider for **local development and CI**. Log in as any email with any
-groups and claims, and get a signed ID token back. Only Docker is needed.
+A tiny OpenID Connect identity provider for **local development and CI**, for any OIDC application. Log in as any
+email with any groups and claims, and get a signed ID token back. Only Docker is needed.
 
 > Not secure by design: no passwords, no consent, a single static client, and any `redirect_uri` is accepted.
 > Never expose it outside a test environment.
@@ -16,7 +16,7 @@ groups and claims, and get a signed ID token back. Only Docker is needed.
 - PKCE (`S256`, `plain`) and public clients
 - Single-use, expiring authorization codes; client id/secret checked by Basic auth or form body
 - Runs with **Docker only**: no Python or pip to install
-- Tested with an independent OIDC client (Authlib) and, optionally, against a real Vault
+- Tested with an independent OIDC client (Authlib); [integration examples](#integration-examples) run against real applications
 - Invalid settings stop the server at start-up with a message naming the setting
 
 ## Quickstart
@@ -29,8 +29,8 @@ docker compose up --build        # http://127.0.0.1:8081
 Open `http://127.0.0.1:8081/authorize?redirect_uri=http://localhost/cb` to see the login page. Pick a saved
 user (from `config/users.json`) or type any email, groups and extra claims.
 
-Point your application at `http://127.0.0.1:8081` as the OIDC issuer, with client id `vault-oidc-client-id`
-and secret `vault-oidc-client-secret` (both configurable).
+Point your application at `http://127.0.0.1:8081` as the OIDC issuer, with client id `mock-idp-client`
+and secret `mock-idp-secret` (both configurable).
 
 ### Skipping the login form (scripts and CI)
 - `POST /set-user` (`Content-Type: application/json`) with
@@ -101,7 +101,7 @@ Environment variables, set in `docker-compose.yml`:
 |---|---|---|
 | `MOCK_IDP_ISSUER` | `http://127.0.0.1:8081` | `iss` claim and base of token/userinfo/jwks URLs |
 | `MOCK_IDP_PUBLIC_URL` | same as issuer | Base URL of `/authorize` as seen by the browser |
-| `MOCK_IDP_CLIENT_ID` / `MOCK_IDP_CLIENT_SECRET` | `vault-oidc-client-id` / `vault-oidc-client-secret` | |
+| `MOCK_IDP_CLIENT_ID` / `MOCK_IDP_CLIENT_SECRET` | `mock-idp-client` / `mock-idp-secret` | |
 | `MOCK_IDP_USERS_FILE` | unset (compose mounts `config/users.json`) | Predefined users, see below |
 | `MOCK_IDP_AUTO_LOGIN` | unset | Email to log in automatically |
 | `MOCK_IDP_CODE_TTL` / `MOCK_IDP_TOKEN_TTL` | `60` / `3600` | seconds |
@@ -119,20 +119,10 @@ Environment variables, set in `docker-compose.yml`:
 Invalid settings stop the server at start-up with a message that names the setting. If `users.json` is broken while
 the server is running, `/authorize` answers `500` with `invalid_users_file` and the reason; fix the file and retry.
 
-## Using it with Vault
+## Integration examples
 
-`examples/vault/check.py` is a complete example. In short:
-
-```sh
-vault auth enable oidc
-vault write auth/oidc/config oidc_discovery_url=http://mock-idp:8081 \
-  oidc_client_id=vault-oidc-client-id oidc_client_secret=vault-oidc-client-secret default_role=identities
-vault write auth/oidc/role/identities role_type=oidc user_claim=email groups_claim=groups \
-  oidc_scopes=openid,email bound_audiences=vault-oidc-client-id \
-  allowed_redirect_uris=http://localhost:8250/oidc/callback
-```
-
-Verified with Vault 2.2 (`./examples/vault/run.sh`, 2026-10-19).
+- [Vault](examples/vault/README.md): OIDC auth method with group-to-policy mapping, checked against a real Vault
+  by `./examples/vault/run.sh`.
 
 ## License
 
