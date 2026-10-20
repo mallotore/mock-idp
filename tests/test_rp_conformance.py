@@ -12,10 +12,7 @@ from authlib.oauth2.rfc6749.errors import MismatchingStateException
 from joserfc import jwt
 from joserfc.jwk import KeySet
 
-import config
-from config import CLIENT_ID, CLIENT_SECRET
-
-REDIRECT = "http://localhost:8250/oidc/callback"
+from helpers import CLIENT_ID, CLIENT_SECRET, REDIRECT
 
 
 @pytest.fixture(autouse=True)
@@ -117,8 +114,8 @@ def test_client_rejects_token_for_a_different_audience(live_server):
     rp.validate_id_token(token["id_token"], aud="another-client")
 
 
-def test_client_rejects_expired_token(live_server, monkeypatch):
-  monkeypatch.setattr(config, "TOKEN_TTL_SECONDS", -10)
+def test_client_rejects_expired_token(live_server, set_config):
+  set_config(TOKEN_TTL_SECONDS=-10)
   rp = RelyingParty(live_server)
   token = rp.fetch_token(rp.log_in_as())
   with pytest.raises(Exception, match="expired|exp"):

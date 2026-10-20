@@ -1,46 +1,13 @@
-import base64, hashlib, time
-from urllib.parse import urlparse, parse_qs
+import base64, threading
 
 import jwt
 import pytest
-import config
-import oidc
+from urllib.parse import urlparse, parse_qs
+
 from app import create_app
-from config import ISSUER, CLIENT_ID, CLIENT_SECRET
-
-REDIRECT = "http://localhost:8250/oidc/callback"
-
-
-def authorize(client, **params):
-  query = {"redirect_uri": REDIRECT, "state": "st", "nonce": "nn", "client_id": CLIENT_ID, **params}
-  return client.get("/authorize", query_string=query)
-
-
-def code_from(response):
-  return parse_qs(urlparse(response.headers["Location"]).query)["code"][0]
-
-
-def exchange(client, code, **overrides):
-  data = {"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT,
-          "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, **overrides}
-  return client.post("/token", data={k: v for k, v in data.items() if v is not None})
-
-
-def login(client, email="jane@example.com", groups="admins,devs"):
-  response = client.post("/login", data={"email": email, "groups": groups,
-                                         "redirect_uri": REDIRECT, "state": "st", "nonce": "nn"})
-  assert response.status_code == 302
-  return code_from(response)
-
-
-def signing_key(client):
-  jwks = client.get("/jwks").get_json()
-  return jwt.PyJWK(jwks["keys"][0]).key
-
-
-def decode(client, response):
-  return jwt.decode(response.get_json()["id_token"], signing_key(client), algorithms=["RS256"],
-                    audience=CLIENT_ID, issuer=ISSUER)
+from helpers import (REDIRECT, ISSUER, CLIENT_ID, CLIENT_SECRET, KEY_ID, authorize, code_from, decode,
+                     exchange, expire_access_token, expire_code, login, peek_next_user, s256, set_clock,
+                     stored_codes, stored_pkce)
 
 
 def test_discovery_document(client):
@@ -87,7 +54,7 @@ def test_id_token_contains_identity_groups_and_nonce(client):
   assert claims["email"] == claims["sub"] == "jane@example.com"
   assert claims["groups"] == ["admins", "devs"]
   assert claims["nonce"] == "nn"
-  assert jwt.get_unverified_header(token)["kid"] == "mock-key-1"
+  assert jwt.get_unverified_header(token)["kid"] == KEY_ID
 
 
 def test_token_without_nonce_omits_claim(client):
@@ -106,7 +73,7 @@ def test_code_is_single_use(client):
 
 def test_expired_code_is_rejected(client):
   code = login(client)
-  oidc.store[code]["expires_at"] = time.time() - 1
+  expire_code(code)
   assert exchange(client, code).status_code == 400
 
 
@@ -157,7 +124,7 @@ def test_set_user_skips_login_form_once(client):
 
 def test_set_user_accepts_comma_separated_groups(client):
   client.post("/set-user", json={"email": "a@b.c", "groups": "x, y"})
-  assert oidc.next_user["groups"] == ["x", "y"]
+  assert peek_next_user()["groups"] == ["x", "y"]
 
 
 def test_set_user_requires_email(client):
@@ -214,10 +181,10 @@ def test_userinfo_requires_a_valid_bearer_token(client):
   assert client.get("/userinfo", headers={"Authorization": "Bearer nope"}).status_code == 401
 
 
-def test_access_token_lives_for_the_full_ttl(client, monkeypatch):
-  monkeypatch.setattr(config, "TOKEN_TTL_SECONDS", 1)
+def test_access_token_lives_for_the_full_ttl(client, monkeypatch, set_config):
+  set_config(TOKEN_TTL_SECONDS=1)
   clock = [1000.9]
-  monkeypatch.setattr(oidc.time, "time", lambda: clock[0])
+  set_clock(monkeypatch, lambda: clock[0])
   access_token = exchange(client, login(client)).get_json()["access_token"]
   auth = {"Authorization": f"Bearer {access_token}"}
   clock[0] = 1001.8
@@ -228,12 +195,8 @@ def test_access_token_lives_for_the_full_ttl(client, monkeypatch):
 
 def test_userinfo_rejects_expired_token(client):
   access_token = exchange(client, login(client)).get_json()["access_token"]
-  oidc.tokens[access_token]["expires_at"] = time.time() - 1
+  expire_access_token(access_token)
   assert client.get("/userinfo", headers={"Authorization": f"Bearer {access_token}"}).status_code == 401
-
-
-def s256(verifier):
-  return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
 
 
 def test_pkce_s256_public_client(client):
@@ -289,11 +252,11 @@ def test_public_client_without_pkce_is_rejected(client):
 
 
 @pytest.fixture
-def users_file(tmp_path, monkeypatch):
+def users_file(tmp_path, set_config):
   path = tmp_path / "users.json"
   path.write_text('{"users": [{"email": "admin@example.com", "groups": ["admins"], "name": "Ada"},'
                   ' {"email": "guest@example.com"}]}')
-  monkeypatch.setattr(config, "USERS_FILE", str(path))
+  set_config(USERS_FILE=str(path))
   return path
 
 
@@ -302,31 +265,31 @@ def test_users_file_populates_login_page(client, users_file):
   assert "admin@example.com" in html and "guest@example.com" in html
 
 
-def test_auto_login_uses_user_from_file(client, users_file, monkeypatch):
-  monkeypatch.setattr(config, "AUTO_LOGIN", "admin@example.com")
+def test_auto_login_uses_user_from_file(client, users_file, set_config):
+  set_config(AUTO_LOGIN="admin@example.com")
   response = authorize(client)
   assert response.status_code == 302
   claims = decode(client, exchange(client, code_from(response)))
   assert claims["groups"] == ["admins"] and claims["name"] == "Ada"
 
 
-def test_auto_login_for_email_not_in_file_has_no_groups(client, monkeypatch):
-  monkeypatch.setattr(config, "AUTO_LOGIN", "ci@example.com")
+def test_auto_login_for_email_not_in_file_has_no_groups(client, set_config):
+  set_config(AUTO_LOGIN="ci@example.com")
   claims = decode(client, exchange(client, code_from(authorize(client))))
   assert claims["email"] == "ci@example.com" and claims["groups"] == []
 
 
-def test_set_user_wins_over_auto_login(client, monkeypatch):
-  monkeypatch.setattr(config, "AUTO_LOGIN", "ci@example.com")
+def test_set_user_wins_over_auto_login(client, set_config):
+  set_config(AUTO_LOGIN="ci@example.com")
   client.post("/set-user", json={"email": "manual@example.com"})
   assert decode(client, exchange(client, code_from(authorize(client))))["email"] == "manual@example.com"
 
 
 @pytest.mark.parametrize("content", ["not json", '{"users": "x"}', '[{"groups": []}]'])
-def test_invalid_users_file_fails_fast(tmp_path, monkeypatch, content):
+def test_invalid_users_file_fails_fast(tmp_path, set_config, content):
   path = tmp_path / "users.json"
   path.write_text(content)
-  monkeypatch.setattr(config, "USERS_FILE", str(path))
+  set_config(USERS_FILE=str(path))
   with pytest.raises(SystemExit) as error:
     create_app()
   assert "invalid configuration" in str(error.value)
@@ -343,21 +306,20 @@ def test_users_file_broken_while_running_returns_a_clear_error(client, users_fil
   assert authorize(client).status_code == 200
 
 
-def test_missing_users_file_fails_fast(monkeypatch):
-  monkeypatch.setattr(config, "USERS_FILE", "/does/not/exist.json")
+def test_missing_users_file_fails_fast(set_config):
+  set_config(USERS_FILE="/does/not/exist.json")
   with pytest.raises(SystemExit):
     create_app()
 
 
 def test_expired_entries_are_purged_on_next_login(client):
   stale = login(client)
-  oidc.store[stale]["expires_at"] = time.time() - 1
+  expire_code(stale)
   login(client)
-  assert stale not in oidc.store
+  assert stale not in stored_codes()
 
 
 def test_code_redeemed_concurrently_succeeds_only_once(client):
-  import threading
   code = login(client)
   barrier = threading.Barrier(8)
   statuses = []
@@ -379,8 +341,8 @@ def test_wrong_client_secret_does_not_consume_the_code(client):
   assert exchange(client, code).status_code == 200
 
 
-def test_basic_auth_credentials_are_form_urldecoded(client, monkeypatch):
-  monkeypatch.setattr(config, "CLIENT_SECRET", "s3cr+t/%")
+def test_basic_auth_credentials_are_form_urldecoded(client, set_config):
+  set_config(CLIENT_SECRET="s3cr+t/%")
   encoded = base64.b64encode(f"{CLIENT_ID}:s3cr%2Bt%2F%25".encode()).decode()
   code = login(client)
   response = client.post("/token", data={"code": code}, headers={"Authorization": f"Basic {encoded}"})
@@ -407,20 +369,20 @@ def test_set_user_requires_a_json_content_type(client):
   """A cross-site page can only send simple content types without a preflight."""
   response = client.post("/set-user", data='{"email": "evil@example.com"}', content_type="text/plain")
   assert response.status_code == 400
-  assert oidc.next_user is None
+  assert peek_next_user() is None
 
 
 def test_login_rejects_unknown_challenge_method(client):
   response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc",
                                          "code_challenge_method": "S512"})
   assert response.status_code == 400
-  assert not oidc.store
+  assert not stored_codes()
 
 
 def test_login_defaults_challenge_method_to_plain(client):
   response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc"})
   assert response.status_code == 302
-  assert next(iter(oidc.store.values()))["pkce"] == {"challenge": "abc", "method": "plain"}
+  assert stored_pkce() == {"challenge": "abc", "method": "plain"}
 
 
 def test_authorize_rejects_unsupported_response_type(client):

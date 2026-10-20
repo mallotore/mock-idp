@@ -1,28 +1,25 @@
 import json
 import subprocess, sys
-from pathlib import Path
 
 import jwt
 import pytest
 
-import config, prepare_mock_idp
-
-SERVER_DIR = Path(config.__file__).parent
+import prepare_mock_idp
+from helpers import KEY_ID, SERVER_DIR
 
 
 @pytest.fixture
-def key_dir(tmp_path, monkeypatch):
-  monkeypatch.setattr(config, "KEY_DIR", tmp_path / "nested" / "keys")
-  monkeypatch.setattr(config, "PRIVATE_KEY_PATH", config.KEY_DIR / "private.pem")
-  monkeypatch.setattr(config, "JWKS_PATH", config.KEY_DIR / "jwks.json")
-  return config.KEY_DIR
+def key_dir(tmp_path, set_config):
+  path = tmp_path / "nested" / "keys"
+  set_config(KEY_DIR=path, PRIVATE_KEY_PATH=path / "private.pem", JWKS_PATH=path / "jwks.json")
+  return path
 
 
 def test_creates_key_dir_private_key_and_jwks(key_dir):
   prepare_mock_idp.main()
   assert (key_dir / "private.pem").exists()
   key = json.loads((key_dir / "jwks.json").read_text())["keys"][0]
-  assert key["kid"] == config.KEY_ID and key["alg"] == "RS256" and key["use"] == "sig"
+  assert key["kid"] == KEY_ID and key["alg"] == "RS256" and key["use"] == "sig"
 
 
 def test_jwks_public_key_matches_the_private_key(key_dir):

@@ -1,0 +1,101 @@
+"""Shared test helpers.
+
+Everything the tests need from the application's internals (settings, stored codes and tokens, the clock)
+goes through this module, so a refactor of those internals only touches one place.
+"""
+import base64, hashlib, time
+from pathlib import Path
+from urllib.parse import urlparse, parse_qs
+
+import jwt
+
+import config
+import oidc
+
+REDIRECT = "http://localhost:8250/oidc/callback"
+ISSUER = config.ISSUER
+CLIENT_ID = config.CLIENT_ID
+CLIENT_SECRET = config.CLIENT_SECRET
+KEY_ID = config.KEY_ID
+SERVER_DIR = Path(config.__file__).parent
+
+
+# --- settings and state -------------------------------------------------------------------------
+
+def override_config(patch, **overrides):
+  """Sets settings on a pytest MonkeyPatch; undone when the patch is."""
+  for name, value in overrides.items():
+    patch.setattr(config, name, value)
+
+
+def reset_state():
+  oidc.store.clear()
+  oidc.tokens.clear()
+  oidc.next_user = None
+
+
+def stored_codes():
+  """Authorization codes that were issued and not redeemed yet."""
+  return dict(oidc.store)
+
+
+def stored_pkce():
+  """The PKCE parameters saved with the only stored code."""
+  [entry] = oidc.store.values()
+  return entry["pkce"]
+
+
+def peek_next_user():
+  """The identity seeded by /set-user, without consuming it."""
+  return oidc.next_user
+
+
+def expire_code(code):
+  oidc.store[code]["expires_at"] = time.time() - 1
+
+
+def expire_access_token(token):
+  oidc.tokens[token]["expires_at"] = time.time() - 1
+
+
+def set_clock(patch, now):
+  """Makes the application see `now()` as the current time."""
+  patch.setattr(oidc.time, "time", now)
+
+
+# --- requests -----------------------------------------------------------------------------------
+
+def s256(verifier):
+  return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+
+
+def code_from(response):
+  return parse_qs(urlparse(response.headers["Location"]).query)["code"][0]
+
+
+def authorize(client, **params):
+  query = {"redirect_uri": REDIRECT, "state": "st", "nonce": "nn", "client_id": CLIENT_ID, **params}
+  return client.get("/authorize", query_string=query)
+
+
+def exchange(client, code, **overrides):
+  data = {"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT,
+          "client_id": CLIENT_ID, "client_secret": CLIENT_SECRET, **overrides}
+  return client.post("/token", data={k: v for k, v in data.items() if v is not None})
+
+
+def login(client, email="jane@example.com", groups="admins,devs"):
+  response = client.post("/login", data={"email": email, "groups": groups,
+                                         "redirect_uri": REDIRECT, "state": "st", "nonce": "nn"})
+  assert response.status_code == 302
+  return code_from(response)
+
+
+def signing_key(client):
+  jwks = client.get("/jwks").get_json()
+  return jwt.PyJWK(jwks["keys"][0]).key
+
+
+def decode(client, response):
+  return jwt.decode(response.get_json()["id_token"], signing_key(client), algorithms=["RS256"],
+                    audience=CLIENT_ID, issuer=ISSUER)

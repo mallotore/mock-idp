@@ -1,13 +1,11 @@
 """The full login over real HTTP, the way a browser and a relying party would do it."""
-import hashlib, base64, re
+import re
 from urllib.parse import urlparse, parse_qs
 
 import jwt
 import requests
 
-from config import CLIENT_ID, CLIENT_SECRET
-
-REDIRECT = "http://localhost:8250/oidc/callback"
+from helpers import CLIENT_ID, CLIENT_SECRET, REDIRECT, s256
 
 
 def discovery(base):
@@ -92,7 +90,7 @@ def test_userinfo_with_the_access_token(live_server):
 
 def test_pkce_flow_through_the_login_form(live_server):
   verifier = "a-long-random-verifier-" + "x" * 30
-  challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+  challenge = s256(verifier)
   query = browser_login(live_server, code_challenge=challenge, code_challenge_method="S256")
   code = query["code"][0]
 
