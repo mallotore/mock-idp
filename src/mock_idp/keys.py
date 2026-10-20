@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -8,6 +9,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from .settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class KeysError(Exception):
@@ -43,7 +46,7 @@ def write_private_key_atomically(path: Path, pem: bytes) -> None:
 
 def create_keys(settings: Settings) -> None:
   if not settings.private_key_path.exists():
-    print("Creating new private key (RSA 2048)")
+    logger.info("Creating new private key (RSA 2048)")
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     pem = key.private_bytes(
       serialization.Encoding.PEM,
@@ -52,7 +55,7 @@ def create_keys(settings: Settings) -> None:
     )
     write_private_key_atomically(settings.private_key_path, pem)
   else:
-    print("RSA keys already exists")
+    logger.info("Using existing private key")
 
 
 def load_private_key(settings: Settings) -> rsa.RSAPrivateKey:
@@ -69,7 +72,7 @@ def create_jwks_json(settings: Settings) -> None:
 
   with open(settings.jwks_path, "w") as f:
     json.dump(jwks, f, indent=2)
-  print(f"JWKS created in {settings.jwks_path}")
+  logger.info("JWKS created in %s", settings.jwks_path)
 
 
 def prepare(settings: Settings) -> None:
@@ -79,4 +82,4 @@ def prepare(settings: Settings) -> None:
     create_jwks_json(settings)
   except (OSError, ValueError) as e:
     raise KeysError(f"cannot prepare keys in MOCK_IDP_KEY_DIR {settings.key_dir}: {e}") from None
-  print("Mock IDP server is ready to be used")
+  logger.info("Mock IDP server is ready to be used")

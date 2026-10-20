@@ -7,6 +7,8 @@ from .app import create_app
 from .settings import ConfigError, Settings
 from .users import UsersFileError, validate_users_file
 
+logger = logging.getLogger(__name__)
+
 
 def main(environ: Mapping[str, str] = os.environ) -> None:
   logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -17,7 +19,7 @@ def main(environ: Mapping[str, str] = os.environ) -> None:
   except (ConfigError, UsersFileError, keys.KeysError) as e:
     raise SystemExit(f"mock-idp: invalid configuration: {e}") from None
   app = create_app(settings)
-  print(f"Mock OIDC IdP server running http://{settings.host}:{settings.port} (issuer {settings.issuer})")
+  logger.info("Mock OIDC IdP server running http://%s:%s (issuer %s)", settings.host, settings.port, settings.issuer)
   app.run(host=settings.host, port=settings.port, debug=settings.debug)
 
 

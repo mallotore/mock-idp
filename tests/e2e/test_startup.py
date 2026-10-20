@@ -25,7 +25,7 @@ def test_bad_users_file_fails_before_any_key_is_created(tmp_path):
   )
   assert result.returncode != 0
   assert "cannot read users file" in result.stderr
-  assert "ready to be used" not in result.stdout
+  assert "ready to be used" not in result.stderr
   assert not (tmp_path / "keys").exists()
 
 
