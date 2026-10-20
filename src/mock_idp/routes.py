@@ -85,6 +85,8 @@ def authorize() -> Response | str:
 
 @oidc_bp.route("/login", methods=["POST"])
 def login() -> Response:
+  # Deliberately permissive: only what is needed to issue a code is checked, not client_id, response_type or
+  # scope (see "Not secure by design" in the README).
   form = request.form
   email = form.get("email")
   redirect_uri = form.get("redirect_uri")

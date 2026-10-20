@@ -5,8 +5,7 @@
 A tiny OpenID Connect identity provider for **local development and CI**, for any OIDC application. Log in as any
 email with any groups and claims, and get a signed ID token back. Only Docker is needed.
 
-> Not secure by design: no passwords, no consent, a single static client, and any `redirect_uri` is accepted.
-> Never expose it outside a test environment.
+> Not secure by design, see [below](#not-secure-by-design). Never expose it outside a test environment.
 
 ## Features at a glance
 
@@ -121,6 +120,14 @@ Environment variables, set in `docker-compose.yml`:
 
 Invalid settings stop the server at start-up with a message that names the setting. If `users.json` is broken while
 the server is running, `/authorize` answers `500` with `invalid_users_file` and the reason; fix the file and retry.
+
+## Not secure by design
+
+- No passwords and no consent: anyone who can reach the server can log in as any identity.
+- A single static client; any `redirect_uri` is accepted.
+- `POST /login` does not re-validate what `/authorize` checked (`client_id`, `response_type`, `scope`). Posting
+  to it directly issues a code without those checks, so the checks in `/authorize` are not a security boundary.
+- `POST /set-user` is unauthenticated (it only requires a JSON content type, which keeps cross-site form posts out).
 
 ## Integration examples
 

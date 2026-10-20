@@ -65,3 +65,10 @@ def test_login_rejects_empty_challenge_method(client):
   response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "code_challenge": "abc",
                                          "code_challenge_method": ""})
   assert response.status_code == 400
+
+
+def test_login_does_not_revalidate_the_authorize_parameters(client):
+  """Documented in the README: posting to /login directly skips the checks /authorize makes."""
+  response = client.post("/login", data={"email": "a@b.c", "redirect_uri": REDIRECT, "client_id": "someone-else",
+                                         "response_type": "token", "scope": "email"})
+  assert response.status_code == 302
