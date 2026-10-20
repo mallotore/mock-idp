@@ -117,6 +117,27 @@ application needs them.
 Invalid settings stop the server at start-up with a message that names the setting. If `users.json` is broken while
 the server is running, `/authorize` answers `500` with `invalid_users_file` and the reason; fix the file and retry.
 
+### Claims recipes
+
+Every identity has `sub` (the email unless overridden), `email` and `groups`. Anything else is an extra claim: a
+key in `users.json`, the `claims` object of `/set-user`, or the JSON in the login form's extra claims field. Extra
+claims can be any JSON value, nested objects included.
+
+| Your application expects | Give the identity |
+|---|---|
+| Groups in `groups` | The groups field: comma-separated in the form, a list in `users.json` and `/set-user` |
+| Roles in a claim of their own | `{"roles": ["admin"]}`, under whatever name the application reads |
+| A username | `{"preferred_username": "ada"}` |
+| An id rather than the email as `sub` | `{"sub": "user-123"}` |
+| Keycloak-style nested roles | `{"realm_access": {"roles": ["admin"]}}` |
+| A verified email | `{"email_verified": true}` |
+
+On the application side, point it at those claims. For example:
+
+- Vault (OIDC auth role): `user_claim=email groups_claim=groups`, as in the [Vault example](examples/vault/README.md).
+- Grafana (`[auth.generic_oauth]`): `groups_attribute_path = groups` and
+  `role_attribute_path = contains(groups[*], 'admins@example.com') && 'Admin' || 'Viewer'`.
+
 ## Endpoints
 
 | Endpoint | Purpose |

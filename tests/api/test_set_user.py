@@ -71,3 +71,13 @@ def test_set_user_errors_use_the_invalid_request_code(client, body):
   assert response.status_code == 400
   assert response.get_json()["error"] == "invalid_request"
   assert response.get_json()["error_description"]
+
+
+def test_nested_extra_claims_reach_the_id_token_and_userinfo(client):
+  claims = {"realm_access": {"roles": ["admin"]}, "email_verified": True}
+  client.post("/set-user", json={"email": "a@b.c", "claims": claims})
+  response = exchange(client, code_from(authorize(client)))
+  id_token = decode(client, response)
+  userinfo = client.get("/userinfo", headers={"Authorization": f"Bearer {response.get_json()['access_token']}"})
+  for source in (id_token, userinfo.get_json()):
+    assert source["realm_access"] == {"roles": ["admin"]} and source["email_verified"] is True
