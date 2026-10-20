@@ -1,6 +1,5 @@
 import time, uuid
 from dataclasses import dataclass
-from . import config
 from .pkce import Pkce
 from .users import User
 
@@ -39,8 +38,8 @@ def purge_expired() -> None:
       if value.expires_at < now:
         registry.pop(key, None)
 
-def issue_code(user: User, nonce: str | None, redirect_uri: str, pkce: Pkce | None) -> str:
+def issue_code(user: User, nonce: str | None, redirect_uri: str, pkce: Pkce | None, ttl: int) -> str:
   purge_expired()
   code = f"code-{uuid.uuid4().hex}"
-  codes[code] = AuthCode(user, nonce, redirect_uri, pkce, time.time() + config.CODE_TTL_SECONDS)
+  codes[code] = AuthCode(user, nonce, redirect_uri, pkce, time.time() + ttl)
   return code

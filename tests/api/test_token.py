@@ -73,8 +73,8 @@ def test_wrong_client_secret_does_not_consume_the_code(client):
   assert exchange(client, code).status_code == 200
 
 
-def test_basic_auth_credentials_are_form_urldecoded(client, set_config):
-  set_config(CLIENT_SECRET="s3cr+t/%")
+def test_basic_auth_credentials_are_form_urldecoded(make_app):
+  client = make_app(client_secret="s3cr+t/%").test_client()
   encoded = base64.b64encode(f"{CLIENT_ID}:s3cr%2Bt%2F%25".encode()).decode()
   code = login(client)
   response = client.post("/token", data={"code": code}, headers={"Authorization": f"Basic {encoded}"})

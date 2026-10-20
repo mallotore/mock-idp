@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from . import config
+from .settings import Settings
 
 class UsersFileError(Exception):
   """The users file is unreadable or malformed."""
@@ -30,26 +30,26 @@ def identity_claims(user: User) -> dict[str, Any]:
   """Claims describing the user, shared by the ID token and /userinfo."""
   return {"sub": user.email, "email": user.email, "groups": user.groups, **user.claims}
 
-def load_users() -> list[User]:
+def load_users(settings: Settings) -> list[User]:
   """Reads the users file on every call so it can be edited without restarting."""
-  if not config.USERS_FILE:
+  if not settings.users_file:
     return []
   try:
-    raw = json.loads(Path(config.USERS_FILE).read_text())
+    raw = json.loads(Path(settings.users_file).read_text())
   except (OSError, ValueError) as e:
-    raise UsersFileError(f"cannot read users file {config.USERS_FILE}: {e}") from None
+    raise UsersFileError(f"cannot read users file {settings.users_file}: {e}") from None
   entries = raw.get("users") if isinstance(raw, dict) else raw
   if not isinstance(entries, list):
-    raise UsersFileError(f"{config.USERS_FILE} must be a list of users or {{\"users\": [...]}}")
+    raise UsersFileError(f"{settings.users_file} must be a list of users or {{\"users\": [...]}}")
   users = []
   for entry in entries:
     if not isinstance(entry, dict) or not entry.get("email"):
-      raise UsersFileError(f"every user in {config.USERS_FILE} needs an 'email'")
+      raise UsersFileError(f"every user in {settings.users_file} needs an 'email'")
     extra = {k: v for k, v in entry.items() if k not in ("email", "groups")}
     users.append(build_user(entry["email"], entry.get("groups"), extra))
   return users
 
-def auto_login_user() -> User | None:
-  if not config.AUTO_LOGIN:
+def auto_login_user(settings: Settings) -> User | None:
+  if not settings.auto_login:
     return None
-  return next((u for u in load_users() if u.email == config.AUTO_LOGIN), build_user(config.AUTO_LOGIN))
+  return next((u for u in load_users(settings) if u.email == settings.auto_login), build_user(settings.auto_login))

@@ -1,20 +1,24 @@
 import json, logging, time
 from dataclasses import asdict
 from urllib.parse import urlencode
-from flask import Blueprint, Response, jsonify, redirect, render_template, request, send_file
-from . import config, stores
+from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, send_file
+from . import stores
 from .errors import INVALID_TOKEN, OAuthError
 from .parsing import parse_authorize_request, request_data, require_authorization_code_grant
 from .pkce import PKCE_METHODS, Pkce, parse_pkce
+from .settings import Settings
 from .tokens import authenticate_client, issue_tokens, redeem_code
 from .users import User, auto_login_user, build_user, identity_claims, load_users
 
 oidc_bp = Blueprint("oidc", __name__)
 logger = logging.getLogger(__name__)
 
+def settings() -> Settings:
+  return current_app.config["MOCK_IDP"]
+
 def redirect_with_code(redirect_uri: str, state: str | None, nonce: str | None, user: User,
                        pkce: Pkce | None) -> Response:
-  code = stores.issue_code(user, nonce, redirect_uri, pkce)
+  code = stores.issue_code(user, nonce, redirect_uri, pkce, settings().code_ttl_seconds)
   params = {"code": code}
   if state:
     params["state"] = state
@@ -36,12 +40,13 @@ def healthz() -> Response:
 
 @oidc_bp.route("/.well-known/openid-configuration")
 def well_known() -> Response:
+  s = settings()
   return jsonify({
-    "issuer": config.ISSUER,
-    "authorization_endpoint": f"{config.PUBLIC_URL}/authorize",
-    "token_endpoint": f"{config.ISSUER}/token",
-    "userinfo_endpoint": f"{config.ISSUER}/userinfo",
-    "jwks_uri": f"{config.ISSUER}/jwks",
+    "issuer": s.issuer,
+    "authorization_endpoint": f"{s.public_url}/authorize",
+    "token_endpoint": f"{s.issuer}/token",
+    "userinfo_endpoint": f"{s.issuer}/userinfo",
+    "jwks_uri": f"{s.issuer}/jwks",
     "response_types_supported": ["code"],
     "subject_types_supported": ["public"],
     "id_token_signing_alg_values_supported": ["RS256"],
@@ -75,11 +80,11 @@ def set_user() -> Response:
 
 @oidc_bp.route("/authorize")
 def authorize() -> Response | str:
-  req = parse_authorize_request(request.args)
-  user = stores.take_next_user() or auto_login_user()
+  req = parse_authorize_request(request.args, settings())
+  user = stores.take_next_user() or auto_login_user(settings())
   if user:
     return redirect_with_code(req.redirect_uri, req.state, req.nonce, user, req.pkce)
-  return render_template("login.html", users=load_users(), redirect_uri=req.redirect_uri, state=req.state,
+  return render_template("login.html", users=load_users(settings()), redirect_uri=req.redirect_uri, state=req.state,
                          nonce=req.nonce, code_challenge=req.code_challenge,
                          code_challenge_method=req.code_challenge_method)
 
@@ -110,9 +115,9 @@ def login() -> Response:
 def token() -> Response:
   data = request_data()
   require_authorization_code_grant(data)
-  authenticate_client(data)
+  authenticate_client(data, settings())
   entry = redeem_code(data)
-  return jsonify(issue_tokens(entry))
+  return jsonify(issue_tokens(entry, settings()))
 
 @oidc_bp.route("/userinfo", methods=["GET", "POST"])
 def userinfo() -> Response:
@@ -124,4 +129,4 @@ def userinfo() -> Response:
 
 @oidc_bp.route("/jwks")
 def jwks() -> Response:
-  return send_file(str(config.JWKS_PATH), mimetype="application/json")
+  return send_file(str(settings().jwks_path), mimetype="application/json")

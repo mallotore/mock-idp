@@ -9,23 +9,19 @@ from urllib.parse import urlparse, parse_qs
 
 import jwt
 
-from mock_idp import config, stores
+from mock_idp import keys, stores
+from mock_idp.settings import Settings
 from mock_idp.users import build_user
 
 REDIRECT = "http://localhost:8250/oidc/callback"
-ISSUER = config.ISSUER
-CLIENT_ID = config.CLIENT_ID
-CLIENT_SECRET = config.CLIENT_SECRET
-KEY_ID = config.KEY_ID
+DEFAULTS = Settings()
+ISSUER = DEFAULTS.issuer
+CLIENT_ID = DEFAULTS.client_id
+CLIENT_SECRET = DEFAULTS.client_secret
+KEY_ID = keys.KEY_ID
 
 
 # --- settings and state -------------------------------------------------------------------------
-
-def override_config(patch, **overrides):
-  """Sets settings on a pytest MonkeyPatch; undone when the patch is."""
-  for name, value in overrides.items():
-    patch.setattr(config, name, value)
-
 
 def reset_state():
   stores.codes.clear()

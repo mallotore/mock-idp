@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import unquote_plus
 from flask import request
-from . import config
+from .settings import Settings
 from .errors import (INVALID_REQUEST, INVALID_SCOPE, UNAUTHORIZED_CLIENT, UNSUPPORTED_GRANT_TYPE,
                      UNSUPPORTED_RESPONSE_TYPE, OAuthError)
 from .pkce import Pkce, parse_pkce
@@ -37,7 +37,7 @@ class AuthorizeRequest:
   code_challenge: str | None
   code_challenge_method: str | None
 
-def parse_authorize_request(args: Mapping[str, str]) -> AuthorizeRequest:
+def parse_authorize_request(args: Mapping[str, str], settings: Settings) -> AuthorizeRequest:
   if args.get("response_type", "code") != "code":
     raise OAuthError(UNSUPPORTED_RESPONSE_TYPE)
   if "openid" not in args.get("scope", "openid").split():
@@ -45,7 +45,7 @@ def parse_authorize_request(args: Mapping[str, str]) -> AuthorizeRequest:
   redirect_uri = args.get("redirect_uri")
   if not redirect_uri:
     raise OAuthError(INVALID_REQUEST, "redirect_uri required")
-  if args.get("client_id") not in (None, config.CLIENT_ID):
+  if args.get("client_id") not in (None, settings.client_id):
     raise OAuthError(UNAUTHORIZED_CLIENT)
   return AuthorizeRequest(redirect_uri, args.get("state"), args.get("nonce"), parse_pkce(args),
                           args.get("code_challenge"), args.get("code_challenge_method"))

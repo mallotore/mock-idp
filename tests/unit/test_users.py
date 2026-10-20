@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from mock_idp.settings import Settings
 from mock_idp.users import (UsersFileError, User, auto_login_user, build_user, identity_claims, load_users,
                             parse_groups)
 
@@ -28,23 +29,23 @@ def test_identity_claims_allow_overriding_sub():
 
 
 @pytest.fixture
-def write_users(tmp_path, set_config):
-  def write(content):
+def write_users(tmp_path):
+  """Writes the users file and returns settings pointing at it."""
+  def write(content, **overrides):
     path = tmp_path / "users.json"
     path.write_text(content if isinstance(content, str) else json.dumps(content))
-    set_config(USERS_FILE=str(path))
+    return Settings(users_file=str(path), **overrides)
   return write
 
 
-def test_no_users_file_means_no_users(set_config):
-  set_config(USERS_FILE=None)
-  assert load_users() == []
+def test_no_users_file_means_no_users():
+  assert load_users(Settings(users_file=None)) == []
 
 
 @pytest.mark.parametrize("wrap", [lambda users: users, lambda users: {"users": users}])
 def test_load_users_from_a_list_or_an_object(write_users, wrap):
-  write_users(wrap([{"email": "a@b.c", "groups": ["g"], "name": "A"}]))
-  assert load_users() == [User("a@b.c", ["g"], {"name": "A"})]
+  settings = write_users(wrap([{"email": "a@b.c", "groups": ["g"], "name": "A"}]))
+  assert load_users(settings) == [User("a@b.c", ["g"], {"name": "A"})]
 
 
 @pytest.mark.parametrize("content", [
@@ -56,29 +57,25 @@ def test_load_users_from_a_list_or_an_object(write_users, wrap):
   "{ broken",
 ])
 def test_invalid_users_files_are_rejected(write_users, content):
-  write_users(content)
+  settings = write_users(content)
   with pytest.raises(UsersFileError):
-    load_users()
+    load_users(settings)
 
 
-def test_unreadable_users_file_is_rejected(set_config):
-  set_config(USERS_FILE="/does/not/exist.json")
+def test_unreadable_users_file_is_rejected():
   with pytest.raises(UsersFileError, match="cannot read users file"):
-    load_users()
+    load_users(Settings(users_file="/does/not/exist.json"))
 
 
-def test_auto_login_user_from_the_file(write_users, set_config):
-  write_users([{"email": "admin@example.com", "groups": ["admins"]}])
-  set_config(AUTO_LOGIN="admin@example.com")
-  assert auto_login_user() == User("admin@example.com", ["admins"], {})
+def test_auto_login_user_from_the_file(write_users):
+  settings = write_users([{"email": "admin@example.com", "groups": ["admins"]}], auto_login="admin@example.com")
+  assert auto_login_user(settings) == User("admin@example.com", ["admins"], {})
 
 
-def test_auto_login_user_falls_back_to_a_bare_user(write_users, set_config):
-  write_users([{"email": "admin@example.com"}])
-  set_config(AUTO_LOGIN="ci@example.com")
-  assert auto_login_user() == User("ci@example.com", [], {})
+def test_auto_login_user_falls_back_to_a_bare_user(write_users):
+  settings = write_users([{"email": "admin@example.com"}], auto_login="ci@example.com")
+  assert auto_login_user(settings) == User("ci@example.com", [], {})
 
 
-def test_no_auto_login_configured(set_config):
-  set_config(AUTO_LOGIN=None)
-  assert auto_login_user() is None
+def test_no_auto_login_configured():
+  assert auto_login_user(Settings(auto_login=None)) is None

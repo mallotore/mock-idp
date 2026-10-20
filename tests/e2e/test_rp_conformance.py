@@ -114,9 +114,8 @@ def test_client_rejects_token_for_a_different_audience(live_server):
     rp.validate_id_token(token["id_token"], aud="another-client")
 
 
-def test_client_rejects_expired_token(live_server, set_config):
-  set_config(TOKEN_TTL_SECONDS=-10)
-  rp = RelyingParty(live_server)
+def test_client_rejects_expired_token(serve):
+  rp = RelyingParty(serve(token_ttl_seconds=-10))
   token = rp.fetch_token(rp.log_in_as())
   with pytest.raises(Exception, match="expired|exp"):
     rp.validate_id_token(token["id_token"])
