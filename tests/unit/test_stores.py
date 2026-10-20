@@ -36,6 +36,7 @@ def test_an_entry_is_valid_until_its_expiry_time(store, clock):
   store.put("k", Item(clock.now() + 10))
   clock.advance(10)
   assert store.get("k") is not None
+  assert store.take("k") is not None
 
 
 def test_get_even_if_expired_also_returns_expired_entries(store, clock):

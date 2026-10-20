@@ -37,6 +37,9 @@ class ExpiringStore(Generic[T]):
     self._items: dict[str, T] = {}
     self._lock = threading.Lock()
 
+  def _live(self, item: T | None) -> T | None:
+    return item if item and item.expires_at >= self._now() else None
+
   def put(self, key: str, item: T) -> None:
     with self._lock:
       self._items[key] = item
@@ -46,7 +49,7 @@ class ExpiringStore(Generic[T]):
       return None
     with self._lock:
       item = self._items.get(key)
-    return item if item and item.expires_at >= self._now() else None
+    return self._live(item)
 
   def get_even_if_expired(self, key: str | None) -> T | None:
     if key is None:
@@ -59,7 +62,7 @@ class ExpiringStore(Generic[T]):
       return None
     with self._lock:
       item = self._items.pop(key, None)
-    return item if item and item.expires_at >= self._now() else None
+    return self._live(item)
 
   def purge(self) -> None:
     with self._lock:
