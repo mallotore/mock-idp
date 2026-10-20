@@ -17,9 +17,18 @@ email with any groups and claims, and get a signed ID token back. Only Docker is
 ## Quickstart
 
 ```sh
-git clone https://github.com/mallotore/mock-idp.git && cd mock-idp
-docker compose up --build        # http://127.0.0.1:8081
+docker run --rm -p 127.0.0.1:8081:8081 ghcr.io/mallotore/mock-idp    # http://127.0.0.1:8081
 ```
+
+Or from a clone, which also mounts the sample users in `config/users.json`:
+
+```sh
+git clone https://github.com/mallotore/mock-idp.git && cd mock-idp
+docker compose up --build
+```
+
+The image is built for `amd64` and `arm64` from every commit to `main` that passes CI (`:latest`, plus `:sha-<commit>`
+to pin one).
 
 Open `http://127.0.0.1:8081/authorize?redirect_uri=http://localhost/cb` to see the login page. Pick a saved
 user (from `config/users.json`) or type any email, groups and extra claims.
@@ -47,7 +56,7 @@ Two URLs are involved: containers reach the IdP by its service name, your browse
 ```yaml
 services:
   mock-idp:
-    build: ./mock-idp                                   # path to your clone of this repository
+    image: ghcr.io/mallotore/mock-idp:latest
     environment:
       MOCK_IDP_ISSUER: http://mock-idp:8081             # what your app container uses as issuer / discovery URL
       MOCK_IDP_PUBLIC_URL: http://127.0.0.1:8081        # what your browser uses for /authorize
