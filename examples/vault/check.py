@@ -1,6 +1,6 @@
 """Configures a dev Vault to use the mock IdP and performs real OIDC logins through it.
 
-Runs inside docker compose (see scripts/vault-check.sh). Only talks to Vault's HTTP API.
+Runs inside docker compose (see run.sh). Only talks to Vault's HTTP API.
 """
 import os
 import sys

@@ -11,12 +11,6 @@ RUN pip install --no-cache-dir ".[test]"
 COPY tests/ ./tests/
 CMD ["pytest"]
 
-# Optional check against a real Vault, see scripts/vault-check.sh
-FROM base AS vault-check
-RUN pip install --no-cache-dir requests==2.34.2
-COPY vault_check/ ./vault_check/
-CMD ["python", "vault_check/check.py"]
-
 # Default target: the mock IdP itself.
 FROM base AS runtime
 RUN adduser -D idp && mkdir -p /data/keys && chown idp /data/keys

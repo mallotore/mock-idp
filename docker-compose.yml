@@ -20,30 +20,3 @@ services:
     build:
       context: .
       target: test
-
-  # Real-Vault check, run through scripts/vault-check.sh
-  vault:
-    profiles: ["vault"]
-    image: hashicorp/vault:2.2
-    command: server -dev -dev-root-token-id=roottoken -dev-listen-address=0.0.0.0:8200
-    cap_add:
-      - IPC_LOCK
-    healthcheck:
-      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
-      interval: 2s
-      retries: 30
-
-  vault-check:
-    profiles: ["vault"]
-    build:
-      context: .
-      target: vault-check
-    depends_on:
-      vault:
-        condition: service_healthy
-      mock-idp:
-        condition: service_healthy
-    environment:
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: roottoken
-      IDP_URL: http://mock-idp:8081

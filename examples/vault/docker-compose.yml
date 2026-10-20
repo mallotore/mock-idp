@@ -1,0 +1,32 @@
+# Combined with the root compose file by run.sh:
+#   docker compose -f docker-compose.yml -f examples/vault/docker-compose.yml ...
+services:
+  mock-idp:
+    environment:
+      # Vault resolves the IdP through the compose network, so the issuer must be the service name.
+      MOCK_IDP_ISSUER: http://mock-idp:8081
+
+  vault:
+    image: hashicorp/vault:2.2
+    command: server -dev -dev-root-token-id=roottoken -dev-listen-address=0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 2s
+      retries: 30
+
+  vault-check:
+    image: python:3.15-alpine
+    command: sh -c "pip install --no-cache-dir requests==2.34.2 && python /check.py"
+    volumes:
+      - ./examples/vault/check.py:/check.py:ro
+    depends_on:
+      vault:
+        condition: service_healthy
+      mock-idp:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: roottoken
+      IDP_URL: http://mock-idp:8081

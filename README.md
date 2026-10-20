@@ -65,7 +65,7 @@ Everything runs from the repo root and needs only Docker.
 | Run one test file | `docker compose run --rm --build test pytest tests/test_flow.py -q` |
 | Run tests matching a name | `docker compose run --rm --build test pytest -k pkce -q` |
 | Check the real image works | `./scripts/smoke.sh` (builds it, starts it, curls the endpoints) |
-| Check against a real Vault | `./scripts/vault-check.sh` (optional, manual in CI) |
+| Check against a real Vault | `./examples/vault/run.sh` (optional, manual in CI) |
 | Add or change users | edit `config/users.json` (re-read on every login, no restart) |
 | Log in without the form | uncomment `MOCK_IDP_AUTO_LOGIN` in `docker-compose.yml`, or `POST /set-user` |
 
@@ -121,7 +121,7 @@ the server is running, `/authorize` answers `500` with `invalid_users_file` and 
 
 ## Using it with Vault
 
-`vault_check/check.py` is a complete example. In short:
+`examples/vault/check.py` is a complete example. In short:
 
 ```sh
 vault auth enable oidc
@@ -132,7 +132,7 @@ vault write auth/oidc/role/identities role_type=oidc user_claim=email groups_cla
   allowed_redirect_uris=http://localhost:8250/oidc/callback
 ```
 
-Verified with Vault 2.2 (`./scripts/vault-check.sh`, 2026-10-19).
+Verified with Vault 2.2 (`./examples/vault/run.sh`, 2026-10-19).
 
 ## License
 
