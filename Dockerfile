@@ -1,32 +1,21 @@
 FROM python:3.15-alpine AS base
 WORKDIR /app
-COPY scripts/requirements.py /usr/local/bin/
-COPY pyproject.toml ./
-RUN python -I /usr/local/bin/requirements.py pyproject.toml build runtime > /tmp/requirements.txt \
-  && pip install --no-cache-dir -r /tmp/requirements.txt
+COPY pyproject.toml README.md LICENSE ./
+COPY src/ ./src/
+RUN pip install --no-cache-dir .
 
 FROM base AS test
-RUN python -I /usr/local/bin/requirements.py pyproject.toml test > /tmp/requirements.txt \
-  && pip install --no-cache-dir -r /tmp/requirements.txt
-COPY README.md LICENSE ./
-COPY src/ ./src/
-RUN pip install --no-cache-dir --no-deps --no-build-isolation .
+RUN pip install --no-cache-dir ".[test]"
 COPY tests/ ./tests/
 CMD ["pytest"]
 
 FROM base AS lint
-RUN python -I /usr/local/bin/requirements.py pyproject.toml dev > /tmp/requirements.txt \
-  && pip install --no-cache-dir -r /tmp/requirements.txt
-COPY src/ ./src/
+RUN pip install --no-cache-dir ".[dev]"
 COPY tests/ ./tests/
 COPY examples/ ./examples/
-COPY scripts/ ./scripts/
 CMD ["sh", "-c", "ruff check . && ruff format --check ."]
 
 FROM base AS runtime
-COPY README.md LICENSE ./
-COPY src/ ./src/
-RUN pip install --no-cache-dir --no-deps --no-build-isolation .
 RUN adduser -D idp && mkdir -p /data/keys && chown idp /data/keys
 USER idp
 ENV MOCK_IDP_HOST=0.0.0.0
