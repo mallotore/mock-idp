@@ -1,7 +1,12 @@
 {
   "users": [
-    {"email": "admin@example.com", "groups": ["admins@example.com", "devs@example.com"], "name": "Ada Admin"},
-    {"email": "dev@example.com", "groups": ["devs@example.com"], "name": "Dan Dev"},
-    {"email": "guest@example.com", "groups": []}
+    {
+      "email": "admin@example.com",
+      "groups": ["admins@example.com", "devs@example.com"],
+      "name": "Ada Admin",
+      "email_verified": true
+    },
+    {"email": "dev@example.com", "groups": ["devs@example.com"], "name": "Dan Dev", "email_verified": true},
+    {"email": "guest@example.com", "groups": [], "name": "Gus Guest", "email_verified": true}
   ]
 }

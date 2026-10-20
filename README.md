@@ -82,8 +82,12 @@ Environment variables, set in `docker-compose.yml`. An empty value counts as uns
 `email` and `groups` becomes a claim:
 
 ```json
-{"users": [{"email": "admin@example.com", "groups": ["admins@example.com"], "name": "Ada Admin"}]}
+{"users": [{"email": "admin@example.com", "groups": ["admins@example.com"], "name": "Ada Admin", "email_verified": true}]}
 ```
+
+Many applications refuse a login without `"email_verified": true`, and some show `name`. The sample users have both;
+when you type an identity in the login form or send one to `/set-user`, add them as extra claims if your
+application needs them.
 
 Invalid settings stop the server at start-up with a message that names the setting. If `users.json` is broken while
 the server is running, `/authorize` answers `500` with `invalid_users_file` and the reason; fix the file and retry.
