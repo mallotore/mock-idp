@@ -62,7 +62,8 @@ Everything runs from the repo root and needs only Docker.
 | Start the IdP | `docker compose up --build` |
 | Stop it | `docker compose down` |
 | Run all tests | `docker compose run --rm --build test` |
-| Run one test file | `docker compose run --rm --build test pytest tests/test_flow.py -q` |
+| Run the fast tests only | `docker compose run --rm --build test pytest -m "not e2e" -q` |
+| Run one test file | `docker compose run --rm --build test pytest tests/e2e/test_flow.py -q` |
 | Run tests matching a name | `docker compose run --rm --build test pytest -k pkce -q` |
 | Check the real image works | `./scripts/smoke.sh` (builds it, starts it, curls the endpoints) |
 | Check against a real Vault | `./examples/vault/run.sh` (optional, manual in CI) |
@@ -71,10 +72,12 @@ Everything runs from the repo root and needs only Docker.
 
 What the tests cover:
 
-- `tests/test_oidc.py`: endpoint behaviour and error cases through the Flask test client.
-- `tests/test_flow.py`: the full login over real HTTP, verifying tokens through discovery and JWKS.
-- `tests/test_rp_conformance.py`: Authlib as an independent relying party, including state, nonce, audience, expiry and PKCE checks.
-- `tests/test_prepare.py`: key generation and configuration errors.
+- `tests/unit/`: pure functions and small classes (PKCE, users, errors, request parsing, keys, settings), no HTTP.
+- `tests/api/`: endpoint behaviour and error cases through the Flask test client, one file per topic.
+- `tests/e2e/test_flow.py`: the full login over real HTTP, verifying tokens through discovery and JWKS.
+- `tests/e2e/test_rp_conformance.py`: Authlib as an independent relying party, including state, nonce, audience, expiry and PKCE checks.
+
+Tests are marked `unit`, `api` or `e2e` by directory, so `pytest -m "not e2e"` is the fast run.
 
 ## Endpoints
 

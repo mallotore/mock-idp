@@ -8,6 +8,14 @@ from mock_idp.app import create_app
 from helpers import override_config, reset_state
 
 
+def pytest_collection_modifyitems(items):
+  """Marks every test with unit, api or e2e after the directory it lives in."""
+  for item in items:
+    kind = item.path.parent.name
+    if kind in ("unit", "api", "e2e"):
+      item.add_marker(getattr(pytest.mark, kind))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def signing_keys(tmp_path_factory):
   """Generate a throwaway RSA key pair so tests never touch the real key dir."""

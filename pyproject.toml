@@ -35,3 +35,8 @@ mock_idp = ["templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "unit: pure functions and small classes, no HTTP (tests/unit)",
+  "api: the Flask test client, in process (tests/api)",
+  "e2e: real HTTP against a served app (tests/e2e)",
+]
