@@ -36,6 +36,8 @@ def create_keys(settings: Settings) -> None:
 def create_jwks_json(settings: Settings) -> None:
   with open(settings.private_key_path, "rb") as f:
     private_key = serialization.load_pem_private_key(f.read(), password=None)
+  if not isinstance(private_key, rsa.RSAPrivateKey):
+    raise TypeError(f"{settings.private_key_path} is not an RSA private key")
   public_numbers = private_key.public_key().public_numbers()
 
   jwks = {

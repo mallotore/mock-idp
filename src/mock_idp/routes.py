@@ -4,6 +4,7 @@ from dataclasses import asdict
 from urllib.parse import urlencode
 
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, send_file
+from werkzeug.wrappers import Response as RedirectResponse
 
 from .errors import INVALID_TOKEN, OAuthError
 from .parsing import parse_authorize_request, request_data, require_authorization_code_grant
@@ -27,7 +28,7 @@ def settings() -> Settings:
 
 def redirect_with_code(
   redirect_uri: str, state: str | None, nonce: str | None, user: User, pkce: Pkce | None
-) -> Response:
+) -> RedirectResponse:
   code = app_state().issue_code(user, nonce, redirect_uri, pkce)
   params = {"code": code}
   if state:
@@ -96,7 +97,7 @@ def set_user() -> Response:
 
 
 @oidc_bp.route("/authorize")
-def authorize() -> Response | str:
+def authorize() -> Response | RedirectResponse | str:
   req = parse_authorize_request(request.args, settings())
   user = app_state().next_user.take() or auto_login_user(settings())
   if user:
@@ -113,7 +114,7 @@ def authorize() -> Response | str:
 
 
 @oidc_bp.route("/login", methods=["POST"])
-def login() -> Response:
+def login() -> RedirectResponse:
   # Deliberately permissive: only what is needed to issue a code is checked, not client_id, response_type or
   # scope (see "Not secure by design" in the README).
   form = request.form

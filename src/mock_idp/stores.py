@@ -43,18 +43,24 @@ class ExpiringStore(Generic[T]):
     with self._lock:
       self._items[key] = item
 
-  def get(self, key: str) -> T | None:
+  def get(self, key: str | None) -> T | None:
+    if key is None:
+      return None
     with self._lock:
       item = self._items.get(key)
     return item if item and item.expires_at >= self._now() else None
 
-  def peek(self, key: str) -> T | None:
+  def peek(self, key: str | None) -> T | None:
     """Like get(), but also returns an expired entry."""
+    if key is None:
+      return None
     with self._lock:
       return self._items.get(key)
 
-  def take(self, key: str) -> T | None:
+  def take(self, key: str | None) -> T | None:
     """Removes the entry and returns it if it has not expired. Of concurrent callers only one gets it."""
+    if key is None:
+      return None
     with self._lock:
       item = self._items.pop(key, None)
     return item if item and item.expires_at >= self._now() else None

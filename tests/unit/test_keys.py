@@ -54,3 +54,16 @@ def test_jwks_document_has_one_rsa_signing_key(settings):
   assert set(key) == {"kty", "use", "alg", "kid", "n", "e"}
   assert (key["kty"], key["use"], key["alg"], key["kid"]) == ("RSA", "sig", "RS256", KEY_ID)
   assert key["e"] == "AQAB" and "=" not in key["n"]
+
+
+def test_a_private_key_that_is_not_rsa_is_rejected(settings):
+  from cryptography.hazmat.primitives import serialization
+  from cryptography.hazmat.primitives.asymmetric import ec
+
+  settings.key_dir.mkdir(parents=True)
+  key = ec.generate_private_key(ec.SECP256R1())
+  settings.private_key_path.write_bytes(
+    key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+  )
+  with pytest.raises(TypeError, match="not an RSA private key"):
+    keys.prepare(settings)

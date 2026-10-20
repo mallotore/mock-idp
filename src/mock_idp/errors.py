@@ -1,4 +1,5 @@
-from flask import Flask, Response, jsonify
+from flask import Flask, jsonify
+from flask.typing import ResponseReturnValue
 
 from .users import UsersFileError
 
@@ -22,14 +23,14 @@ class OAuthError(Exception):
     self.error, self.description, self.status, self.headers = error, description, status, headers or {}
 
 
-def oauth_error(error: OAuthError) -> Response:
+def oauth_error(error: OAuthError) -> ResponseReturnValue:
   body = {"error": error.error}
   if error.description:
     body["error_description"] = error.description
   return jsonify(body), error.status, error.headers
 
 
-def users_file_error(error: UsersFileError) -> Response:
+def users_file_error(error: UsersFileError) -> ResponseReturnValue:
   """A users file broken while the server runs is reported to the caller, not by dropping the request."""
   return oauth_error(OAuthError(INVALID_USERS_FILE, str(error), status=500))
 

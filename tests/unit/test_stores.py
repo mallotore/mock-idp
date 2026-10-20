@@ -102,3 +102,7 @@ def test_issue_code_stores_the_code_with_its_ttl_and_purges_expired_ones(clock):
   assert list(state.codes.snapshot()) == [code]
   assert stale not in state.codes.snapshot()
   assert state.codes.get(code).expires_at == clock.now() + 60
+
+
+def test_a_missing_key_is_never_found(store):
+  assert store.get(None) is None and store.peek(None) is None and store.take(None) is None
