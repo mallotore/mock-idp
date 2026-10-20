@@ -9,7 +9,8 @@ from urllib.parse import urlparse, parse_qs
 
 import jwt
 
-from mock_idp import config, oidc
+from mock_idp import config, stores
+from mock_idp.users import build_user
 
 REDIRECT = "http://localhost:8250/oidc/callback"
 ISSUER = config.ISSUER
@@ -27,46 +28,46 @@ def override_config(patch, **overrides):
 
 
 def reset_state():
-  oidc.store.clear()
-  oidc.tokens.clear()
-  oidc.next_user = None
+  stores.codes.clear()
+  stores.tokens.clear()
+  stores.next_user = None
 
 
 def stored_codes():
   """Authorization codes that were issued and not redeemed yet."""
-  return dict(oidc.store)
+  return dict(stores.codes)
 
 
 def fill_store(count):
   """Adds `count` unexpired authorization codes."""
   expires_at = time.time() + 3600
-  user = oidc.build_user("filler@example.com")
+  user = build_user("filler@example.com")
   for i in range(count):
-    oidc.store[f"filler-{i}"] = oidc.AuthCode(user, None, REDIRECT, None, expires_at)
+    stores.codes[f"filler-{i}"] = stores.AuthCode(user, None, REDIRECT, None, expires_at)
 
 
 def stored_pkce():
   """The PKCE parameters saved with the only stored code."""
-  [entry] = oidc.store.values()
+  [entry] = stores.codes.values()
   return asdict(entry.pkce)
 
 
 def peek_next_user():
   """The identity seeded by /set-user, without consuming it."""
-  return asdict(oidc.next_user) if oidc.next_user else None
+  return asdict(stores.next_user) if stores.next_user else None
 
 
 def expire_code(code):
-  oidc.store[code].expires_at = time.time() - 1
+  stores.codes[code].expires_at = time.time() - 1
 
 
 def expire_access_token(token):
-  oidc.tokens[token].expires_at = time.time() - 1
+  stores.tokens[token].expires_at = time.time() - 1
 
 
 def set_clock(patch, now):
   """Makes the application see `now()` as the current time."""
-  patch.setattr(oidc.time, "time", now)
+  patch.setattr(stores.time, "time", now)
 
 
 # --- requests -----------------------------------------------------------------------------------
