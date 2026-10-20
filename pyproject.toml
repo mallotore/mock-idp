@@ -24,6 +24,11 @@ test = [
   "joserfc==1.7.7",
 ]
 
+dev = [
+  "ruff==0.17.1",
+  "mypy==2.4.0",
+]
+
 [project.scripts]
 mock-idp = "mock_idp.__main__:main"
 
@@ -40,3 +45,17 @@ markers = [
   "api: the Flask test client, in process (tests/api)",
   "e2e: real HTTP against a served app (tests/e2e)",
 ]
+
+[tool.ruff]
+indent-width = 2
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mock_idp"]
+known-local-folder = ["helpers"]
+
+[tool.mypy]
+files = ["src"]
