@@ -22,6 +22,9 @@ FROM base AS runtime
 RUN adduser -D idp && chown -R idp /app/mock_idp_server
 USER idp
 ENV MOCK_IDP_HOST=0.0.0.0
+# Unbuffered stdout so lines show up at once in `docker compose logs`.
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8081
 HEALTHCHECK --interval=5s --timeout=3s --retries=10 \
   CMD wget -qO- http://127.0.0.1:${MOCK_IDP_PORT:-8081}/healthz || exit 1
