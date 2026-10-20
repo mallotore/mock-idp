@@ -1,8 +1,10 @@
 import base64, hashlib, hmac, json, logging, secrets, time, uuid, jwt
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlencode, unquote_plus
-from flask import Blueprint, request, jsonify, redirect, render_template, send_file
+from flask import Blueprint, Response, request, jsonify, redirect, render_template, send_file
 from . import config
 
 oidc_bp = Blueprint("oidc", __name__)
@@ -27,32 +29,56 @@ class UsersFileError(Exception):
 
 class OAuthError(Exception):
   """An error answered as JSON: {"error": ..., "error_description": ...} (description omitted when empty)."""
-  def __init__(self, error, description="", status=400, headers=None):
+  def __init__(self, error: str, description: str = "", status: int = 400, headers: dict[str, str] | None = None):
     super().__init__(error)
     self.error, self.description, self.status, self.headers = error, description, status, headers or {}
 
 # Claims a user can never override through `claims` or the users file.
 RESERVED_CLAIMS = {"iss", "aud", "exp", "iat", "nonce"}
 
-store = {}   # authorization code -> {user, nonce, redirect_uri, pkce, expires_at}
-tokens = {}  # access token -> {user, expires_at}
-# Identity used by the next /authorize call, set through POST /set-user (consumed once).
-next_user = None
+@dataclass
+class User:
+  email: str
+  groups: list[str] = field(default_factory=list)
+  claims: dict[str, Any] = field(default_factory=dict)
 
-def parse_groups(raw):
+@dataclass
+class Pkce:
+  challenge: str
+  method: str
+
+@dataclass
+class AuthCode:
+  user: User
+  nonce: str | None
+  redirect_uri: str
+  pkce: Pkce | None
+  expires_at: float
+
+@dataclass
+class AccessToken:
+  user: User
+  expires_at: float
+
+store: dict[str, AuthCode] = {}
+tokens: dict[str, AccessToken] = {}
+# Identity used by the next /authorize call, set through POST /set-user (consumed once).
+next_user: User | None = None
+
+def parse_groups(raw: Any) -> list[str]:
   if isinstance(raw, list):
     return [str(g).strip() for g in raw if str(g).strip()]
   return [g.strip() for g in str(raw or "").split(",") if g.strip()]
 
-def build_user(email, groups=None, claims=None):
+def build_user(email: str, groups: Any = None, claims: Mapping[str, Any] | None = None) -> User:
   extra = {k: v for k, v in (claims or {}).items() if k not in RESERVED_CLAIMS}
-  return {"email": email, "groups": parse_groups(groups), "claims": extra}
+  return User(email, parse_groups(groups), extra)
 
-def identity_claims(user):
+def identity_claims(user: User) -> dict[str, Any]:
   """Claims describing the user, shared by the ID token and /userinfo."""
-  return {"sub": user["email"], "email": user["email"], "groups": user["groups"], **user["claims"]}
+  return {"sub": user.email, "email": user.email, "groups": user.groups, **user.claims}
 
-def load_users():
+def load_users() -> list[User]:
   """Reads the users file on every call so it can be edited without restarting."""
   if not config.USERS_FILE:
     return []
@@ -71,12 +97,12 @@ def load_users():
     users.append(build_user(entry["email"], entry.get("groups"), extra))
   return users
 
-def auto_login_user():
+def auto_login_user() -> User | None:
   if not config.AUTO_LOGIN:
     return None
-  return next((u for u in load_users() if u["email"] == config.AUTO_LOGIN), build_user(config.AUTO_LOGIN))
+  return next((u for u in load_users() if u.email == config.AUTO_LOGIN), build_user(config.AUTO_LOGIN))
 
-def validate_config():
+def validate_config() -> None:
   """Fails fast at start-up instead of on the first request."""
   try:
     load_users()
@@ -84,33 +110,33 @@ def validate_config():
     config.fail(str(e))
 
 @oidc_bp.app_errorhandler(UsersFileError)
-def users_file_error(error):
+def users_file_error(error: UsersFileError) -> Response:
   """A users file broken while the server runs is reported to the caller, not by dropping the request."""
   return oauth_error(OAuthError(INVALID_USERS_FILE, str(error), status=500))
 
 @oidc_bp.app_errorhandler(OAuthError)
-def oauth_error(error):
+def oauth_error(error: OAuthError) -> Response:
   body = {"error": error.error}
   if error.description:
     body["error_description"] = error.description
   return jsonify(body), error.status, error.headers
 
-def purge_expired():
+def purge_expired() -> None:
   now = time.time()
   for registry in (store, tokens):
     # Snapshot first: other request threads may insert while this one iterates.
     for key, value in list(registry.items()):
-      if value["expires_at"] < now:
+      if value.expires_at < now:
         registry.pop(key, None)
 
-def request_data():
+def request_data() -> Mapping[str, Any]:
   """Form fields, or a JSON object for clients that post JSON."""
   if request.form:
     return request.form
   data = request.get_json(silent=True)
   return data if isinstance(data, dict) else {}
 
-def client_credentials():
+def client_credentials() -> tuple[Any, Any]:
   """Returns (client_id, client_secret) from HTTP Basic auth or the request body."""
   auth = request.headers.get("Authorization", "")
   if auth.startswith("Basic "):
@@ -122,7 +148,7 @@ def client_credentials():
   data = request_data()
   return data.get("client_id"), data.get("client_secret")
 
-def parse_pkce(params):
+def parse_pkce(params: Mapping[str, Any]) -> Pkce | None:
   """Returns the PKCE parameters from /authorize query args or /login form fields; None without a challenge.
 
   An absent code_challenge_method means "plain"; an empty or unknown one is an error.
@@ -133,18 +159,18 @@ def parse_pkce(params):
   challenge = params.get("code_challenge")
   if not challenge:
     return None
-  return {"challenge": challenge, "method": method or PLAIN}
+  return Pkce(challenge, method or PLAIN)
 
-def pkce_matches(pkce, verifier):
+def pkce_matches(pkce: Pkce, verifier: str | None) -> bool:
   if not verifier:
     return False
-  if pkce["method"] == S256:
+  if pkce.method == S256:
     digest = hashlib.sha256(verifier.encode()).digest()
     verifier = base64.urlsafe_b64encode(digest).decode().rstrip("=")
-  return hmac.compare_digest(verifier.encode(), pkce["challenge"].encode())
+  return hmac.compare_digest(verifier.encode(), pkce.challenge.encode())
 
 @oidc_bp.after_request
-def no_store_token_responses(response):
+def no_store_token_responses(response: Response) -> Response:
   """RFC 6749 section 5.1: token responses must not be cached."""
   if request.path == "/token":
     response.headers["Cache-Control"] = "no-store"
@@ -152,11 +178,11 @@ def no_store_token_responses(response):
   return response
 
 @oidc_bp.route("/healthz")
-def healthz():
+def healthz() -> Response:
   return jsonify({"status": "ok"})
 
 @oidc_bp.route("/.well-known/openid-configuration")
-def well_known():
+def well_known() -> Response:
   return jsonify({
     "issuer": config.ISSUER,
     "authorization_endpoint": f"{config.PUBLIC_URL}/authorize",
@@ -173,7 +199,7 @@ def well_known():
   })
 
 @oidc_bp.route("/set-user", methods=["POST"])
-def set_user():
+def set_user() -> Response:
   """Pre-seeds the identity of the next login so tests can skip the login form.
 
   Body: {"email": "...", "groups": ["a", "b"], "claims": {"name": "Jane"}}
@@ -192,18 +218,18 @@ def set_user():
     raise OAuthError("claims must be an object")
 
   next_user = build_user(email, data.get("groups"), data.get("claims"))
-  return jsonify({"status": "ok", "user": next_user})
+  return jsonify({"status": "ok", "user": asdict(next_user)})
 
 @dataclass
 class AuthorizeRequest:
   redirect_uri: str
-  state: str
-  nonce: str
-  pkce: dict
-  code_challenge: str
-  code_challenge_method: str
+  state: str | None
+  nonce: str | None
+  pkce: Pkce | None
+  code_challenge: str | None
+  code_challenge_method: str | None
 
-def parse_authorize_request(args):
+def parse_authorize_request(args: Mapping[str, str]) -> AuthorizeRequest:
   if args.get("response_type", "code") != "code":
     raise OAuthError(UNSUPPORTED_RESPONSE_TYPE)
   if "openid" not in args.get("scope", "openid").split():
@@ -217,7 +243,7 @@ def parse_authorize_request(args):
                           args.get("code_challenge"), args.get("code_challenge_method"))
 
 @oidc_bp.route("/authorize")
-def authorize():
+def authorize() -> Response | str:
   req = parse_authorize_request(request.args)
 
   global next_user
@@ -231,7 +257,7 @@ def authorize():
                          code_challenge_method=req.code_challenge_method)
 
 @oidc_bp.route("/login", methods=["POST"])
-def login():
+def login() -> Response:
   form = request.form
   email = form.get("email")
   redirect_uri = form.get("redirect_uri")
@@ -251,7 +277,7 @@ def login():
   user = build_user(email, form.get("groups"), claims)
   return issue_code_and_redirect(redirect_uri, form.get("state"), form.get("nonce"), user, pkce)
 
-def require_authorization_code_grant(data):
+def require_authorization_code_grant(data: Mapping[str, Any]) -> None:
   # JSON clients can send any type; form fields are always strings.
   for name in ("grant_type", "code", "code_verifier", "redirect_uri"):
     if not isinstance(data.get(name, ""), str):
@@ -259,12 +285,12 @@ def require_authorization_code_grant(data):
   if data.get("grant_type", "authorization_code") != "authorization_code":
     raise OAuthError(UNSUPPORTED_GRANT_TYPE)
 
-def secret_matches(given):
+def secret_matches(given: Any) -> bool:
   if not isinstance(given, str):
     return False
   return hmac.compare_digest(given.encode(), config.CLIENT_SECRET.encode())
 
-def authenticate_client(data):
+def authenticate_client(data: Mapping[str, Any]) -> None:
   """Checks the client without consuming the code, so a failed attempt leaves it redeemable."""
   client_id, client_secret = client_credentials()
   if client_id != config.CLIENT_ID:
@@ -272,23 +298,23 @@ def authenticate_client(data):
   if client_secret is None:
     # Public clients are only accepted when they protect the code with PKCE.
     entry = store.get(data.get("code"))
-    if not (entry and entry["pkce"]):
+    if not (entry and entry.pkce):
       raise OAuthError(INVALID_CLIENT, status=401)
   elif not secret_matches(client_secret):
     raise OAuthError(INVALID_CLIENT, status=401)
 
-def redeem_code(data):
+def redeem_code(data: Mapping[str, Any]) -> AuthCode:
   """Codes are single use and short lived. pop() is atomic, so of several concurrent requests only one gets it."""
   entry = store.pop(data.get("code"), None)
-  if not entry or time.time() > entry["expires_at"]:
+  if not entry or time.time() > entry.expires_at:
     raise OAuthError(INVALID_GRANT, "code not found or expired")
-  if data.get("redirect_uri") not in (None, entry["redirect_uri"]):
+  if data.get("redirect_uri") not in (None, entry.redirect_uri):
     raise OAuthError(INVALID_GRANT, "redirect_uri mismatch")
-  if entry["pkce"] and not pkce_matches(entry["pkce"], data.get("code_verifier")):
+  if entry.pkce and not pkce_matches(entry.pkce, data.get("code_verifier")):
     raise OAuthError(INVALID_GRANT, "code_verifier mismatch")
   return entry
 
-def build_id_token(user, nonce):
+def build_id_token(user: User, nonce: str | None) -> str:
   now = int(time.time())
   payload = {
     **identity_claims(user),
@@ -301,18 +327,18 @@ def build_id_token(user, nonce):
     payload["nonce"] = nonce
   return jwt.encode(payload, config.PRIVATE_KEY_PATH.read_bytes(), algorithm="RS256", headers={"kid": config.KEY_ID})
 
-def issue_tokens(entry):
+def issue_tokens(entry: AuthCode) -> dict[str, Any]:
   access_token = secrets.token_urlsafe(24)
-  tokens[access_token] = {"user": entry["user"], "expires_at": time.time() + config.TOKEN_TTL_SECONDS}
+  tokens[access_token] = AccessToken(entry.user, time.time() + config.TOKEN_TTL_SECONDS)
   return {
     "access_token": access_token,
-    "id_token": build_id_token(entry["user"], entry["nonce"]),
+    "id_token": build_id_token(entry.user, entry.nonce),
     "token_type": "Bearer",
     "expires_in": config.TOKEN_TTL_SECONDS,
   }
 
 @oidc_bp.route("/token", methods=["POST"])
-def token():
+def token() -> Response:
   data = request_data()
   require_authorization_code_grant(data)
   authenticate_client(data)
@@ -320,32 +346,27 @@ def token():
   return jsonify(issue_tokens(entry))
 
 @oidc_bp.route("/userinfo", methods=["GET", "POST"])
-def userinfo():
+def userinfo() -> Response:
   auth = request.headers.get("Authorization", "")
   entry = tokens.get(auth[7:]) if auth.startswith("Bearer ") else None
-  if not entry or time.time() > entry["expires_at"]:
+  if not entry or time.time() > entry.expires_at:
     raise OAuthError(INVALID_TOKEN, status=401, headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
-  return jsonify(identity_claims(entry["user"]))
+  return jsonify(identity_claims(entry.user))
 
 @oidc_bp.route("/jwks")
-def jwks():
+def jwks() -> Response:
   return send_file(str(config.JWKS_PATH), mimetype="application/json")
 
-def issue_code_and_redirect(redirect_uri, state, nonce, user, pkce=None):
+def issue_code_and_redirect(redirect_uri: str, state: str | None, nonce: str | None, user: User,
+                            pkce: Pkce | None = None) -> Response:
   purge_expired()
   code = f"code-{uuid.uuid4().hex}"
-  store[code] = {
-    "nonce": nonce,
-    "user": user,
-    "redirect_uri": redirect_uri,
-    "pkce": pkce,
-    "expires_at": time.time() + config.CODE_TTL_SECONDS,
-  }
+  store[code] = AuthCode(user, nonce, redirect_uri, pkce, time.time() + config.CODE_TTL_SECONDS)
 
   params = {"code": code}
   if state:
     params["state"] = state
 
-  logger.info("Issued auth code %s for user=%s", code, user)
+  logger.info("Issued auth code %s for user=%s", code, user.email)
   separator = "&" if "?" in redirect_uri else "?"
   return redirect(f"{redirect_uri}{separator}{urlencode(params)}", code=302)

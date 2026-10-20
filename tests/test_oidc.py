@@ -265,6 +265,11 @@ def test_users_file_populates_login_page(client, users_file):
   assert "admin@example.com" in html and "guest@example.com" in html
 
 
+def test_login_page_embeds_saved_users_with_groups_and_claims(client, users_file):
+  html = authorize(client).get_data(as_text=True)
+  assert '"groups": ["admins"]' in html and '"claims": {"name": "Ada"}' in html
+
+
 def test_auto_login_uses_user_from_file(client, users_file, set_config):
   set_config(AUTO_LOGIN="admin@example.com")
   response = authorize(client)

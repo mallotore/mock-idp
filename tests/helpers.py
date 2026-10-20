@@ -4,6 +4,7 @@ Everything the tests need from the application's internals (settings, stored cod
 goes through this module, so a refactor of those internals only touches one place.
 """
 import base64, hashlib, time
+from dataclasses import asdict
 from urllib.parse import urlparse, parse_qs
 
 import jwt
@@ -39,28 +40,28 @@ def stored_codes():
 def fill_store(count):
   """Adds `count` unexpired authorization codes."""
   expires_at = time.time() + 3600
+  user = oidc.build_user("filler@example.com")
   for i in range(count):
-    oidc.store[f"filler-{i}"] = {"nonce": None, "user": None, "redirect_uri": REDIRECT, "pkce": None,
-                                 "expires_at": expires_at}
+    oidc.store[f"filler-{i}"] = oidc.AuthCode(user, None, REDIRECT, None, expires_at)
 
 
 def stored_pkce():
   """The PKCE parameters saved with the only stored code."""
   [entry] = oidc.store.values()
-  return entry["pkce"]
+  return asdict(entry.pkce)
 
 
 def peek_next_user():
   """The identity seeded by /set-user, without consuming it."""
-  return oidc.next_user
+  return asdict(oidc.next_user) if oidc.next_user else None
 
 
 def expire_code(code):
-  oidc.store[code]["expires_at"] = time.time() - 1
+  oidc.store[code].expires_at = time.time() - 1
 
 
 def expire_access_token(token):
-  oidc.tokens[token]["expires_at"] = time.time() - 1
+  oidc.tokens[token].expires_at = time.time() - 1
 
 
 def set_clock(patch, now):
