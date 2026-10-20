@@ -63,6 +63,22 @@ services:
     ports: ["127.0.0.1:8081:8081"]
 ```
 
+### Keeping the signing key across restarts
+
+A new container makes a new signing key. The key ID changes with it, so applications fetch the new key, but tokens
+issued before the restart stop validating. To keep the key, put `/data/keys` on a named volume:
+
+```yaml
+services:
+  mock-idp:
+    image: ghcr.io/mallotore/mock-idp:latest
+    volumes: ["mock-idp-keys:/data/keys"]
+volumes:
+  mock-idp-keys:
+```
+
+or `docker run -v mock-idp-keys:/data/keys ...`.
+
 ## Skipping the login form (scripts and CI)
 
 - `POST /set-user` (`Content-Type: application/json`) with
@@ -85,7 +101,7 @@ Environment variables, set in `docker-compose.yml`. An empty value counts as uns
 | `MOCK_IDP_CODE_TTL` / `MOCK_IDP_TOKEN_TTL` | `60` / `3600` | seconds |
 | `MOCK_IDP_PORT` / `MOCK_IDP_HOST` | `8081` / `127.0.0.1` (`0.0.0.0` in the image) | The compose file publishes on `127.0.0.1` only. If you change the port, change `ports` in `docker-compose.yml` too |
 | `MOCK_IDP_DEBUG` | `false` | Flask debug mode; refused unless `MOCK_IDP_HOST` is loopback |
-| `MOCK_IDP_KEY_DIR` | `./mock_idp_files` (the image uses `/data/keys`) | Keys are regenerated whenever the container is recreated. The key ID changes with the key, so running apps fetch the new one |
+| `MOCK_IDP_KEY_DIR` | `./mock_idp_files` (the image uses `/data/keys`) | Keys are regenerated whenever the container is recreated unless the directory is on a volume, see [Keeping the signing key across restarts](#keeping-the-signing-key-across-restarts) |
 
 `config/users.json` is re-read on every login, so you can edit it without restarting. Every key other than
 `email` and `groups` becomes a claim:
@@ -135,7 +151,7 @@ Codes expire after 60 s and are single use. Token responses are sent with `Cache
   `prompt=none` is ignored.
 - A single static client; `redirect_uri` is optional on `/token` and is not checked against a registered list.
 - `/login` does not re-validate the authorize parameters (see above).
-- Signing keys are not persistent: they are regenerated when the container is recreated.
+- Signing keys are regenerated when the container is recreated, unless `/data/keys` is on a volume.
 
 ## Integration examples
 
